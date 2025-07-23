@@ -1,39 +1,19 @@
-//      ******************************************************************
-//      *                                                                *
-//      *                 Header file for FlexyStepper.c                 *
-//      *                                                                *
-//      *               Copyright (c) S. Reifel & Co, 2014               *
-//      *                                                                *
-//      ******************************************************************
-
-
-// MIT License
-// 
-// Copyright (c) 2014 Stanley Reifel & Co.
-// 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
-// of this software and associated documentation files (the "Software"), to deal
-// in the Software without restriction, including without limitation the rights
-// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-// copies of the Software, and to permit persons to whom the Software is furnished
-// to do so, subject to the following conditions:
-// 
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
-// 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-// SOFTWARE.
-
-
 #ifndef FLEXY_STEPPER_H
 #define FLEXY_STEPPER_H
 
-#include "main.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define MCU_ARDUINO
+// #define MCU_STM32
+
+#ifdef MCU_ARDUINO
+    #include <Arduino.h>
+#else
+    #include "main.h"
+#endif
+
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -46,13 +26,20 @@
 
 // FlexyStepper structure
 typedef struct {
-    // Pin configuration
-    GPIO_TypeDef* stepPort;
-    uint16_t stepPin;
-    GPIO_TypeDef* directionPort;
-    uint16_t directionPin;
-    GPIO_TypeDef* enablePort;
-    uint16_t enablePin;
+
+    #ifdef MCU_ARDUINO
+        uint8_t stepPin;
+        uint8_t directionPin;
+        uint8_t enablePin;
+    #else
+        // Pin configuration
+        GPIO_TypeDef* stepPort;
+        uint16_t stepPin;
+        GPIO_TypeDef* directionPort;
+        uint16_t directionPin;
+        GPIO_TypeDef* enablePort;
+        uint16_t enablePin;
+    #endif
     
     // Motion parameters
     float stepsPerMillimeter;
@@ -77,18 +64,27 @@ typedef struct {
     char motorName[20];
 } FlexyStepper;
 
-void FlexyStepper_attach_timer_for_micros(TIM_HandleTypeDef* htim);
-void FlexyStepper_attach_logger(UART_HandleTypeDef * uart);
+#ifdef MCU_ARDUINO
+
+#else
+    void FlexyStepper_attach_timer_for_micros(TIM_HandleTypeDef* htim);
+    void FlexyStepper_attach_logger(UART_HandleTypeDef * uart);
+#endif
+
 void FlexyStepper_log(const char *format, ...);
 
 //----------------------------------------------------------------
 // Setup functions
 void FlexyStepper_Init(FlexyStepper* stepper, char* name);
-void FlexyStepper_connectToPins(FlexyStepper* stepper, GPIO_TypeDef* stepPort, uint16_t stepPin, 
-                              GPIO_TypeDef* directionPort, uint16_t directionPin);
-void FlexyStepper_connectEnablePin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse);
 void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state);
-
+#ifdef MCU_ARDUINO
+    void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin);
+    void FlexyStepper_connectEnablePin(FlexyStepper* stepper, uint8_t pin, bool inverse);
+#else
+    void FlexyStepper_connectToPins(FlexyStepper* stepper, GPIO_TypeDef* stepPort, uint16_t stepPin, 
+                                GPIO_TypeDef* directionPort, uint16_t directionPin);
+    void FlexyStepper_connectEnablePin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse);
+#endif
 // Functions with units in millimeters
 void FlexyStepper_setStepsPerMillimeter(FlexyStepper* stepper, float motorStepPerMillimeter);
 float FlexyStepper_getCurrentPositionInMillimeters(FlexyStepper* stepper);
@@ -143,6 +139,23 @@ void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositio
 float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper);
 
 void FlexyStepper_loop(FlexyStepper* stepper);
+
+
+// MACROS
+
+#ifdef MCU_ARDUINO
+    #define WRITE_PIN(port, pin, value) digitalWrite(pin, value)
+    #define GET_MICROS micros()
+    #define DELAY_MICROS(micros) delayMicroseconds(micros)
+#else
+    #define WRITE_PIN(port, pin, value) HAL_GPIO_WritePin(port, pin, value)
+    #defube GET_MICROS HAL_GetMicros()
+    #define DELAY_MICROS(micros) HAL_DelayMicros(micros)
+#endif
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // FLEXY_STEPPER_H
 

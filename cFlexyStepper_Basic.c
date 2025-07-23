@@ -63,18 +63,17 @@ float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper) {
 }
 
 //-------------------------------------------------------------------------------
-void FlexyStepper_connectEnablePin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse) {
-    stepper->inverse_enablePin = inverse;
-    stepper->enablePort = port;
-    stepper->enablePin = pin;
-
-    FlexyStepper_en_motor(stepper, 0);
-}
 
 void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state) {
-    stepper->inverse_enablePin ? 
-    HAL_GPIO_WritePin(stepper->enablePort, stepper->enablePin, !state) :
-    HAL_GPIO_WritePin(stepper->enablePort, stepper->enablePin, state);
+    //XXX
+    // stepper->inverse_enablePin ? 
+    // HAL_GPIO_WritePin(stepper->enablePort, stepper->enablePin, !state) :
+    // HAL_GPIO_WritePin(stepper->enablePort, stepper->enablePin, state);
+
+    stepper->inverse_enablePin ?
+        WRITE_PIN(stepper->enablePort, stepper->enablePin, !state) :
+        WRITE_PIN(stepper->enablePort, stepper->enablePin, state);
+
     
 }
 //-------------------------------------------------------------------------------
