@@ -1,13 +1,19 @@
 #include "../cFlexyStepper.h"
-
 #ifdef MCU_ARDUINO
 
-void FlexyStepper_log(const char *format, ...)
-{
 
+// Logging function for FlexyStepper using Arduino Serial
+extern "C" void FlexyStepper_log(const char *format, ...)
+{
+    char buffer[256];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+    Serial.print(buffer);
 }
 
-void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin)
+extern "C" void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin)
 {
     // Remember the pin configurations
     stepper->stepPin = stepPin;
@@ -22,17 +28,10 @@ void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t 
     digitalWrite(directionPin, LOW);
 }
 
-void FlexyStepper_connectEnablePin(FlexyStepper* stepper, uint8_t pin, bool inverse)
+extern "C" void FlexyStepper_connectEnablePin(FlexyStepper* stepper, uint8_t pin, bool inverse)
 {
     // Remember the pin configuration
     stepper->enablePin = pin;
     stepper->inverse_enablePin = inverse;
-
-    // Set enable pin to output and default HIGH (disabled)
-    pinMode(pin, OUTPUT);
-    digitalWrite(pin, inverse ? HIGH : LOW);
 }
-
-
-
 #endif

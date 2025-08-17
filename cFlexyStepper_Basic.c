@@ -87,14 +87,13 @@ void FlexyStepper_Estop(FlexyStepper* stepper) {
 
 
 void FlexyStepper_loop(FlexyStepper* stepper) {
-    if(!FlexyStepper_motionComplete(stepper)) {
-        FlexyStepper_processMovement(stepper);
-    }
-
     //auto disable
     if(stepper->is_moving)
     {
-        if(FlexyStepper_motionComplete(stepper))
+        if(!FlexyStepper_motionComplete(stepper)) {
+            FlexyStepper_processMovement(stepper);
+        }
+        else
         {
             FlexyStepper_log("[%s] movement finished\r\n", stepper->motorName);
             stepper->is_moving = false;

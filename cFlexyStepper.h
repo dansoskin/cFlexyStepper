@@ -1,10 +1,6 @@
 #ifndef FLEXY_STEPPER_H
 #define FLEXY_STEPPER_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define MCU_ARDUINO
 // #define MCU_STM32
 
@@ -14,6 +10,12 @@ extern "C" {
     #include "main.h"
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include <stdarg.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -65,13 +67,14 @@ typedef struct {
 } FlexyStepper;
 
 #ifdef MCU_ARDUINO
-
+    void FlexyStepper_log(const char *format, ...);
 #else
     void FlexyStepper_attach_timer_for_micros(TIM_HandleTypeDef* htim);
     void FlexyStepper_attach_logger(UART_HandleTypeDef * uart);
+    void FlexyStepper_log(const char *format, ...);
 #endif
 
-void FlexyStepper_log(const char *format, ...);
+
 
 //----------------------------------------------------------------
 // Setup functions
@@ -85,6 +88,7 @@ void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state);
                                 GPIO_TypeDef* directionPort, uint16_t directionPin);
     void FlexyStepper_connectEnablePin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse);
 #endif
+/*
 // Functions with units in millimeters
 void FlexyStepper_setStepsPerMillimeter(FlexyStepper* stepper, float motorStepPerMillimeter);
 float FlexyStepper_getCurrentPositionInMillimeters(FlexyStepper* stepper);
@@ -96,7 +100,8 @@ void FlexyStepper_setTargetPositionRelativeInMillimeters(FlexyStepper* stepper, 
 void FlexyStepper_moveToPositionInMillimeters(FlexyStepper* stepper, float absolutePositionToMoveToInMillimeters);
 void FlexyStepper_setTargetPositionInMillimeters(FlexyStepper* stepper, float absolutePositionToMoveToInMillimeters);
 float FlexyStepper_getCurrentVelocityInMillimetersPerSecond(FlexyStepper* stepper);
-
+*/
+/*
 // Functions with units in revolutions
 void FlexyStepper_setStepsPerRevolution(FlexyStepper* stepper, float motorStepPerRevolution);
 float FlexyStepper_getCurrentPositionInRevolutions(FlexyStepper* stepper);
@@ -108,6 +113,7 @@ void FlexyStepper_setTargetPositionRelativeInRevolutions(FlexyStepper* stepper, 
 void FlexyStepper_moveToPositionInRevolutions(FlexyStepper* stepper, float absolutePositionToMoveToInRevolutions);
 void FlexyStepper_setTargetPositionInRevolutions(FlexyStepper* stepper, float absolutePositionToMoveToInRevolutions);
 float FlexyStepper_getCurrentVelocityInRevolutionsPerSecond(FlexyStepper* stepper);
+*/
 
 // Functions with units in steps
 void FlexyStepper_setCurrentPositionInSteps(FlexyStepper* stepper, int32_t currentPositionInSteps);
@@ -138,6 +144,7 @@ void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanc
 void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositionToMoveTo, bool should_release);
 float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper);
 
+void FlexyStepper_Estop(FlexyStepper* stepper);
 void FlexyStepper_loop(FlexyStepper* stepper);
 
 
