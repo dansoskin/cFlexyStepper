@@ -14,7 +14,7 @@ void FlexyStepper_attach_timer_for_micros(TIM_HandleTypeDef* htim) {
 }
 
 // Get microseconds timing (similar to Arduino's micros())
-static uint32_t HAL_GetMicros(void) {
+uint32_t HAL_GetMicros(void) {
     if (micros_tim == NULL) {
         // Fallback to HAL_GetTick if timer not initialized
         return HAL_GetTick() * 1000;
@@ -26,7 +26,7 @@ static uint32_t HAL_GetMicros(void) {
 }
 
 // Microseconds delay (similar to Arduino's delayMicroseconds())
-static void HAL_DelayMicros(uint32_t micros) {
+void HAL_DelayMicros(uint32_t micros) {
     uint32_t start = HAL_GetMicros();
     while ((HAL_GetMicros() - start) < micros);
 }

@@ -1,8 +1,8 @@
 #ifndef FLEXY_STEPPER_H
 #define FLEXY_STEPPER_H
 
-#define MCU_ARDUINO
-// #define MCU_STM32
+//#define MCU_ARDUINO
+ #define MCU_STM32
 
 #ifdef MCU_ARDUINO
     #include <Arduino.h>
@@ -18,6 +18,7 @@ extern "C" {
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
 #include <stdint.h>
 #include <math.h>
 
@@ -68,10 +69,21 @@ typedef struct {
 
 #ifdef MCU_ARDUINO
     void FlexyStepper_log(const char *format, ...);
+
+	#define WRITE_PIN(port, pin, value) digitalWrite(pin, value)
+    #define GET_MICROS micros()
+    #define DELAY_MICROS(micros) delayMicroseconds(micros)
 #else
+    uint32_t HAL_GetMicros(void);
+    void HAL_DelayMicros(uint32_t micros);
+
     void FlexyStepper_attach_timer_for_micros(TIM_HandleTypeDef* htim);
     void FlexyStepper_attach_logger(UART_HandleTypeDef * uart);
     void FlexyStepper_log(const char *format, ...);
+
+	#define WRITE_PIN(port, pin, value) HAL_GPIO_WritePin(port, pin, value)
+	#define GET_MICROS HAL_GetMicros()
+	#define DELAY_MICROS(micros) HAL_DelayMicros(micros)
 #endif
 
 
@@ -147,18 +159,6 @@ float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper);
 void FlexyStepper_Estop(FlexyStepper* stepper);
 void FlexyStepper_loop(FlexyStepper* stepper);
 
-
-// MACROS
-
-#ifdef MCU_ARDUINO
-    #define WRITE_PIN(port, pin, value) digitalWrite(pin, value)
-    #define GET_MICROS micros()
-    #define DELAY_MICROS(micros) delayMicroseconds(micros)
-#else
-    #define WRITE_PIN(port, pin, value) HAL_GPIO_WritePin(port, pin, value)
-    #defube GET_MICROS HAL_GetMicros()
-    #define DELAY_MICROS(micros) HAL_DelayMicros(micros)
-#endif
 
 #ifdef __cplusplus
 }
