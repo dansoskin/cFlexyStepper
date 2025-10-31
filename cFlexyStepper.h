@@ -149,12 +149,14 @@ void FlexyStepper_setConversion(FlexyStepper* stepper, float conversion);
 float FlexyStepper_getCurrentPosition(FlexyStepper* stepper);
 void FlexyStepper_setCurrentPosition(FlexyStepper* stepper, float position);
 
+float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper);
 void FlexyStepper_setSpeed(FlexyStepper* stepper, float speed);
 void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration);
+float FlexyStepper_getTargetSpeed(FlexyStepper* stepper);
+void FlexyStepper_jog(FlexyStepper * stepper, float speed);
 
 void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanceToMove, bool should_release);
 void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositionToMoveTo, bool should_release);
-float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper);
 
 void FlexyStepper_Estop(FlexyStepper* stepper);
 void FlexyStepper_loop(FlexyStepper* stepper);
