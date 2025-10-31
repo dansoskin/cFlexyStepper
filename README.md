@@ -12,10 +12,11 @@ This library is designed for STM32 microcontrollers but can be easily adapted to
 
 ```c
 // Initialize the stepper motor
-FlexyStepper stepper;
 FlexyStepper_attach_timer_for_micros(&htim23);
-FlexyStepper_Init(&stepper, "Stepper1");
 FlexyStepper_attach_logger(&huart3);
+
+FlexyStepper stepper;
+FlexyStepper_Init(&stepper, "Stepper1");
 
 // Connect to hardware pins
 FlexyStepper_connectToPins(&stepper, PUL_GPIO_Port, PUL_Pin, DIR_GPIO_Port, DIR_Pin);
