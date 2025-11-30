@@ -33,5 +33,8 @@ extern "C" void FlexyStepper_connectEnablePin(FlexyStepper* stepper, uint8_t pin
     // Remember the pin configuration
     stepper->enablePin = pin;
     stepper->inverse_enablePin = inverse;
+
+    pinMode(stepper->enablePin, OUTPUT);
+    digitalWrite(stepper->enablePin, stepper->inverse_enablePin ? HIGH : LOW);
 }
 #endif
