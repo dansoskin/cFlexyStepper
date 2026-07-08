@@ -13,7 +13,7 @@ This library is designed for STM32 microcontrollers but can be easily adapted to
 ```c
 // Initialize the stepper motor
 FlexyStepper_attach_timer_for_micros(&htim23);
-FlexyStepper_attach_logger(&huart3);
+FlexyStepper_attach_logger(&huart6);
 
 FlexyStepper stepper;
 FlexyStepper_Init(&stepper, "Stepper1");

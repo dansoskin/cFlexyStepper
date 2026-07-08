@@ -31,7 +31,7 @@ typedef enum cFlexyStepper_homing_sm_states
 {
 	HOMING_IDLE, HOMING_MOVE_TOWARDS_LIMIT, HOMING_DELAY1,
 	HOMING_MOVE_AWAY_FROM_LIMIT, HOMING_DELAY2,
-	HOMING_ADJUST_POSITION, HOMING_DELAY3
+	HOMING_ADJUST_POSITION, HOMING_DELAY3, HOMING_ERROR
 } cFlexyStepper_homing_sm_states;
 
 
@@ -79,6 +79,7 @@ typedef struct {
     int8_t homing_direction;
     float homing_speed;
     float homing_adjust_position;
+    uint8_t* homing_limit_switch_ptr;
 } FlexyStepper;
 
 #ifdef MCU_ARDUINO
@@ -106,7 +107,14 @@ typedef struct {
 // Setup functions
 void FlexyStepper_Init(FlexyStepper* stepper, char* name);
 void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state);
-void FlexyStepper_set_homing(FlexyStepper* stepper, uint8_t homing_direction, uint8_t homing_speed, float homing_adjust_position);
+void FlexyStepper_set_homing(
+                            FlexyStepper* stepper, 
+                            int8_t homing_direction,
+                            uint8_t homing_speed,
+                            float homing_adjust_position,
+                            uint8_t* homing_limit_switch_ptr
+                            );
+
 
 #ifdef MCU_ARDUINO
     void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin);
