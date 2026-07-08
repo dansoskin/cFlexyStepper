@@ -27,6 +27,14 @@ extern "C" {
 #define POSITIVE_DIRECTION 0
 #define NEGATIVE_DIRECTION 1
 
+typedef enum cFlexyStepper_homing_sm_states
+{
+	HOMING_IDLE, HOMING_MOVE_TOWARDS_LIMIT, HOMING_DELAY1,
+	HOMING_MOVE_AWAY_FROM_LIMIT, HOMING_DELAY2,
+	HOMING_ADJUST_POSITION, HOMING_DELAY3
+} cFlexyStepper_homing_sm_states;
+
+
 // FlexyStepper structure
 typedef struct {
 
@@ -65,6 +73,12 @@ typedef struct {
     bool is_moving;
     bool should_release;
     char motorName[20];
+
+    uint32_t homing_sm_timer;
+    cFlexyStepper_homing_sm_states homing_sm_state;
+    int8_t homing_direction;
+    float homing_speed;
+    float homing_adjust_position;
 } FlexyStepper;
 
 #ifdef MCU_ARDUINO
@@ -92,6 +106,8 @@ typedef struct {
 // Setup functions
 void FlexyStepper_Init(FlexyStepper* stepper, char* name);
 void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state);
+void FlexyStepper_set_homing(FlexyStepper* stepper, uint8_t homing_direction, uint8_t homing_speed, float homing_adjust_position);
+
 #ifdef MCU_ARDUINO
     void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin);
     void FlexyStepper_connectEnablePin(FlexyStepper* stepper, uint8_t pin, bool inverse);
@@ -100,6 +116,8 @@ void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state);
                                 GPIO_TypeDef* directionPort, uint16_t directionPin);
     void FlexyStepper_connectEnablePin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse);
 #endif
+
+
 /*
 // Functions with units in millimeters
 void FlexyStepper_setStepsPerMillimeter(FlexyStepper* stepper, float motorStepPerMillimeter);
@@ -161,6 +179,13 @@ void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositio
 void FlexyStepper_Estop(FlexyStepper* stepper);
 void FlexyStepper_loop(FlexyStepper* stepper);
 
+//----------------------------------------------------------------
+
+
+void set_cFlexyStepper_homing_sm_state(FlexyStepper* stepper, cFlexyStepper_homing_sm_states st);
+cFlexyStepper_homing_sm_states get_cFlexyStepper_homing_sm_state(FlexyStepper* stepper);
+void start_cFlexyStepper_homing_sm(FlexyStepper* stepper);
+void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper);
 
 #ifdef __cplusplus
 }
