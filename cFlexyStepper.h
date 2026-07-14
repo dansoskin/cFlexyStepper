@@ -76,10 +76,12 @@ typedef struct {
 
     uint32_t homing_sm_timer;
     cFlexyStepper_homing_sm_states homing_sm_state;
-    int8_t homing_direction;
+    int homing_direction;
     float homing_speed;
     float homing_adjust_position;
     uint8_t* homing_limit_switch_ptr;
+    float zero_pos;
+    float speed_after_homing;
 } FlexyStepper;
 
 #ifdef MCU_ARDUINO
@@ -107,14 +109,13 @@ typedef struct {
 // Setup functions
 void FlexyStepper_Init(FlexyStepper* stepper, char* name);
 void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state);
-void FlexyStepper_set_homing(
-                            FlexyStepper* stepper, 
-                            int8_t homing_direction,
-                            uint8_t homing_speed,
-                            float homing_adjust_position,
-                            uint8_t* homing_limit_switch_ptr
-                            );
-
+void FlexyStepper_set_homing(FlexyStepper* stepper,
+							int homing_direction,
+							float  homing_speed,
+							float  homing_adjust_position,
+							uint8_t* homing_limit_switch_ptr,
+							float new_zero_position);
+void stop_cFlexyStepper_homing_sm(FlexyStepper* stepper);
 
 #ifdef MCU_ARDUINO
     void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin);
@@ -184,7 +185,7 @@ void FlexyStepper_jog(FlexyStepper * stepper, float speed);
 void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanceToMove, bool should_release);
 void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositionToMoveTo, bool should_release);
 
-void FlexyStepper_Estop(FlexyStepper* stepper);
+void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release);
 void FlexyStepper_loop(FlexyStepper* stepper);
 
 //----------------------------------------------------------------

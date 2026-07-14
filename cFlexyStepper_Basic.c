@@ -17,60 +17,52 @@ void FlexyStepper_setCurrentPosition(FlexyStepper* stepper, float position) {
 
 //-------------------
 float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper) {
-    return FlexyStepper_getCurrentVelocityInStepsPerSecond(stepper) / stepper->conversion;
+    return FlexyStepper_getCurrentVelocityInStepsPerSecond(stepper) / fabsf(stepper->conversion);
 }
 
 void FlexyStepper_setSpeed(FlexyStepper* stepper, float speed) {
     FlexyStepper_log("[%s] Speed: %.4f\r\n", stepper->motorName, speed);
-    FlexyStepper_setSpeedInStepsPerSecond(stepper, speed * stepper->conversion);
+    // Speed is a magnitude: only |conversion| may scale it. A negative conversion
+    // must invert position/direction, never make the speed negative.
+    FlexyStepper_setSpeedInStepsPerSecond(stepper, speed * fabsf(stepper->conversion));
 }
 
 void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration) {
     FlexyStepper_log("[%s] Acceleration: %.4f\r\n", stepper->motorName, acceleration);
-    FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, acceleration * stepper->conversion);
+    // Acceleration must stay positive: a negative value makes sqrt(2*accel) NaN in the
+    // core, which poisons periodOfSlowestStep and makes jog/moves run out of control.
+    FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, acceleration * fabsf(stepper->conversion));
 }
 
 float FlexyStepper_getTargetSpeed(FlexyStepper* stepper)
 {
-	return stepper->desiredSpeed_InStepsPerSecond / stepper->conversion;
+	return stepper->desiredSpeed_InStepsPerSecond / fabsf(stepper->conversion);
 }
 
 void FlexyStepper_jog(FlexyStepper * stepper, float speed)
 {
 	FlexyStepper_log("[%s] Jog: %.4f\r\n", stepper->motorName, speed);
 
+    if(speed == 0)
+    {
+        FlexyStepper_Estop(stepper, true);
+        return;
+    }
+    FlexyStepper_setCurrentPositionInSteps(stepper, 0);
+    // stepper->currentStepPeriod_InUS = 0.0;
+    // stepper->nextStepPeriod_InUS = 0.0;
+    // stepper->directionOfMotion = 0;
+
+    stepper->is_moving = true;
+    stepper->should_release = 1;
+    FlexyStepper_setSpeedInStepsPerSecond(stepper, fabsf(speed * stepper->conversion));
+
+
+    FlexyStepper_en_motor(stepper, 1);
 	if(speed > 0)
-	{
-		FlexyStepper_setSpeedInStepsPerSecond(stepper, speed * stepper->conversion);
-
-		// Reset current motion state to start acceleration from zero
-		stepper->currentStepPeriod_InUS = 0.0;
-		stepper->nextStepPeriod_InUS = 0.0;
-		stepper->directionOfMotion = 0;
-
-		FlexyStepper_en_motor(stepper, 1);
-		FlexyStepper_setTargetPositionInSteps(stepper, (int32_t)round(9999999 * stepper->conversion));
-		stepper->is_moving = true;
-		stepper->should_release = 1;
-	}
-	else if(speed < 0)
-	{
-		FlexyStepper_setSpeedInStepsPerSecond(stepper, -1*speed * stepper->conversion);
-
-		// Reset current motion state to start acceleration from zero
-		stepper->currentStepPeriod_InUS = 0.0;
-		stepper->nextStepPeriod_InUS = 0.0;
-		stepper->directionOfMotion = 0;
-
-		FlexyStepper_en_motor(stepper, 1);
-		FlexyStepper_setTargetPositionInSteps(stepper, (int32_t)round(-9999999 * stepper->conversion));
-		stepper->is_moving = true;
-		stepper->should_release = 1;
-	}
-	else
-	{
-		FlexyStepper_Estop(stepper);
-	}
+        FlexyStepper_setTargetPositionInSteps(stepper, (int32_t)round(9999999.0 * stepper->conversion));
+    else
+        FlexyStepper_setTargetPositionInSteps(stepper, (int32_t)round(-9999999.0 * stepper->conversion));
 }
 
 //-------------------
@@ -107,7 +99,7 @@ void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state) {
     
 }
 //-------------------------------------------------------------------------------
-void FlexyStepper_Estop(FlexyStepper* stepper) {
+void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release) {
     stepper->directionOfMotion = 0;
     stepper->targetPosition_InSteps = stepper->currentPosition_InSteps;
     
@@ -115,8 +107,13 @@ void FlexyStepper_Estop(FlexyStepper* stepper) {
     stepper->currentStepPeriod_InUS = 0.0;
     stepper->nextStepPeriod_InUS = 0.0;
 
+    if(should_release) {
+        FlexyStepper_en_motor(stepper, 0);
+    }
+
     FlexyStepper_loop(stepper);
     FlexyStepper_log("[%s] Estop\r\n", stepper->motorName);
+
 }
 
 
