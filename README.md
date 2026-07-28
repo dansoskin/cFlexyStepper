@@ -25,6 +25,7 @@ FlexyStepper_connectEnablePin(&stepper, EN_GPIO_Port, EN_Pin, true);
 // Configure motion parameters
 FlexyStepper_setConversion(&stepper, 3200.0);  // Steps per unit (e.g., steps per revolution or mm)
 FlexyStepper_setAcceleration(&stepper, 10);    // Units per second²
+FlexyStepper_setDeceleration(&stepper, 15);
 FlexyStepper_setSpeed(&stepper, 4);            // Units per second
 
 // Move 10 units in the positive direction

@@ -63,7 +63,17 @@ typedef struct {
     float desiredPeriod_InUSPerStep;
     float acceleration_InStepsPerSecondPerSecond;
     float acceleration_InStepsPerUSPerUS;
+    float deceleration_InStepsPerSecondPerSecond;
+    float deceleration_InStepsPerUSPerUS;
+    /* periodOfSlowestStep_InUS is the period of the first step taken from rest,
+     * so it follows acceleration. decelPeriodOfSlowestStep_InUS is the floor the
+     * slow-down ramp clamps to, so it follows deceleration.
+     * minimumPeriodForAStoppedMotion decides when a move counts as finished and
+     * MUST derive from the same ramp as the clamp -- if the ramp cannot reach
+     * the threshold the move never completes and the motor overshoots, reverses
+     * and oscillates around the target. */
     float periodOfSlowestStep_InUS;
+    float decelPeriodOfSlowestStep_InUS;
     float minimumPeriodForAStoppedMotion;
     float nextStepPeriod_InUS;
     uint32_t lastStepTime_InUS;
@@ -158,7 +168,12 @@ float FlexyStepper_getCurrentVelocityInRevolutionsPerSecond(FlexyStepper* steppe
 void FlexyStepper_setCurrentPositionInSteps(FlexyStepper* stepper, int32_t currentPositionInSteps);
 int32_t FlexyStepper_getCurrentPositionInSteps(FlexyStepper* stepper);
 void FlexyStepper_setSpeedInStepsPerSecond(FlexyStepper* stepper, float speedInStepsPerSecond);
+/* Sets acceleration AND deceleration to the same value, so existing callers are
+ * unaffected. To use different ramps, call this first and then
+ * FlexyStepper_setDecelerationInStepsPerSecondPerSecond(). */
 void FlexyStepper_setAccelerationInStepsPerSecondPerSecond(FlexyStepper* stepper, float accelerationInStepsPerSecondPerSecond);
+/* Deceleration only. Must be called AFTER setAcceleration*, which resets it. */
+void FlexyStepper_setDecelerationInStepsPerSecondPerSecond(FlexyStepper* stepper, float decelerationInStepsPerSecondPerSecond);
 void FlexyStepper_moveRelativeInSteps(FlexyStepper* stepper, int32_t distanceToMoveInSteps);
 void FlexyStepper_setTargetPositionRelativeInSteps(FlexyStepper* stepper, int32_t distanceToMoveInSteps);
 void FlexyStepper_moveToPositionInSteps(FlexyStepper* stepper, int32_t absolutePositionToMoveToInSteps);
@@ -178,7 +193,9 @@ void FlexyStepper_setCurrentPosition(FlexyStepper* stepper, float position);
 
 float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper);
 void FlexyStepper_setSpeed(FlexyStepper* stepper, float speed);
+/* Sets both ramps. Call before FlexyStepper_setDeceleration(), not after. */
 void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration);
+void FlexyStepper_setDeceleration(FlexyStepper* stepper, float deceleration);
 float FlexyStepper_getTargetSpeed(FlexyStepper* stepper);
 void FlexyStepper_jog(FlexyStepper * stepper, float speed);
 

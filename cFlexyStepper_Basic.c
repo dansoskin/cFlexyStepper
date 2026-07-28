@@ -34,6 +34,15 @@ void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration) {
     FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, acceleration * fabsf(stepper->conversion));
 }
 
+// Deceleration is reset to match acceleration by every setAcceleration call, so
+// this must come second when the two ramps are meant to differ.
+void FlexyStepper_setDeceleration(FlexyStepper* stepper, float deceleration) {
+    FlexyStepper_log("[%s] Deceleration: %.4f\r\n", stepper->motorName, deceleration);
+    // Same reasoning as acceleration: a non-positive value makes sqrt(2*decel)
+    // NaN or infinite and poisons the slow-down ramp.
+    FlexyStepper_setDecelerationInStepsPerSecondPerSecond(stepper, deceleration * fabsf(stepper->conversion));
+}
+
 float FlexyStepper_getTargetSpeed(FlexyStepper* stepper)
 {
 	return stepper->desiredSpeed_InStepsPerSecond / fabsf(stepper->conversion);

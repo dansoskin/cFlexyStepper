@@ -121,9 +121,33 @@ void FlexyStepper_setAccelerationInStepsPerSecondPerSecond(
     stepper->acceleration_InStepsPerSecondPerSecond = accelerationInStepsPerSecondPerSecond;
     stepper->acceleration_InStepsPerUSPerUS = accelerationInStepsPerSecondPerSecond / 1E12;
 
-    stepper->periodOfSlowestStep_InUS = 
+    stepper->periodOfSlowestStep_InUS =
         1000000.0 / sqrt(2.0 * accelerationInStepsPerSecondPerSecond);
-    stepper->minimumPeriodForAStoppedMotion = stepper->periodOfSlowestStep_InUS / 2.8;
+
+    // Keep the ramps symmetric unless the caller explicitly asks otherwise, so
+    // that every existing caller behaves exactly as it did before deceleration
+    // became independent.
+    FlexyStepper_setDecelerationInStepsPerSecondPerSecond(stepper,
+                                                          accelerationInStepsPerSecondPerSecond);
+}
+
+//
+// Set the rate of deceleration, units in steps/second/second. Call this AFTER
+// setAccelerationInStepsPerSecondPerSecond(), which resets deceleration to match
+// acceleration.
+//
+void FlexyStepper_setDecelerationInStepsPerSecondPerSecond(
+                     FlexyStepper* stepper, float decelerationInStepsPerSecondPerSecond) {
+    stepper->deceleration_InStepsPerSecondPerSecond = decelerationInStepsPerSecondPerSecond;
+    stepper->deceleration_InStepsPerUSPerUS = decelerationInStepsPerSecondPerSecond / 1E12;
+
+    // The slow-down ramp clamps at this period, and a move is declared finished
+    // when the next period reaches minimumPeriodForAStoppedMotion. Both come
+    // from deceleration so the ramp can always reach the threshold; deriving
+    // them from different rates would let a move never complete.
+    stepper->decelPeriodOfSlowestStep_InUS =
+        1000000.0 / sqrt(2.0 * decelerationInStepsPerSecondPerSecond);
+    stepper->minimumPeriodForAStoppedMotion = stepper->decelPeriodOfSlowestStep_InUS / 2.8;
 }
 
 //
@@ -184,7 +208,7 @@ void FlexyStepper_setTargetPositionToStop(FlexyStepper* stepper) {
     
     // Move the target position so that the motor will begin deceleration now
     decelerationDistance_InSteps = (int32_t)round(
-        5E11 / (stepper->acceleration_InStepsPerSecondPerSecond * stepper->currentStepPeriod_InUS * 
+        5E11 / (stepper->deceleration_InStepsPerSecondPerSecond * stepper->currentStepPeriod_InUS *
         stepper->currentStepPeriod_InUS));
 
     if (stepper->directionOfMotion > 0)
@@ -249,7 +273,7 @@ void FlexyStepper_DeterminePeriodOfNextStep(FlexyStepper* stepper) {
     // velocity of 0, Steps = Velocity^2 / (2 * Acceleration)
     currentStepPeriodSquared = stepper->currentStepPeriod_InUS * stepper->currentStepPeriod_InUS;
     decelerationDistance_InSteps = (int32_t)round(
-        5E11 / (stepper->acceleration_InStepsPerSecondPerSecond * currentStepPeriodSquared));
+        5E11 / (stepper->deceleration_InStepsPerSecondPerSecond * currentStepPeriodSquared));
     
     // Check if: Moving in a positive direction & Moving toward the target
     if ((stepper->directionOfMotion == 1) && (targetInPositiveDirectionFlag)) {
@@ -264,7 +288,7 @@ void FlexyStepper_DeterminePeriodOfNextStep(FlexyStepper* stepper) {
     // Check if: Moving in a positive direction & Moving away from the target
     else if ((stepper->directionOfMotion == 1) && (targetInNegativeDirectionFlag)) {
         // Need to slow down, then reverse direction
-        if (stepper->currentStepPeriod_InUS < stepper->periodOfSlowestStep_InUS) {
+        if (stepper->currentStepPeriod_InUS < stepper->decelPeriodOfSlowestStep_InUS) {
             slowDownFlag = true;
         }
         else {
@@ -290,7 +314,7 @@ void FlexyStepper_DeterminePeriodOfNextStep(FlexyStepper* stepper) {
     // Check if: Moving in a negative direction & Moving away from the target
     else if ((stepper->directionOfMotion == -1) && (targetInPositiveDirectionFlag)) {
         // Need to slow down, then reverse direction
-        if (stepper->currentStepPeriod_InUS < stepper->periodOfSlowestStep_InUS) {
+        if (stepper->currentStepPeriod_InUS < stepper->decelPeriodOfSlowestStep_InUS) {
             slowDownFlag = true;
         }
         else {
@@ -315,11 +339,11 @@ void FlexyStepper_DeterminePeriodOfNextStep(FlexyStepper* stepper) {
     // Check if decelerating
     if (slowDownFlag) {
         // StepPeriod = StepPeriod(1 + a * StepPeriod^2)
-        stepper->nextStepPeriod_InUS = stepper->currentStepPeriod_InUS + stepper->acceleration_InStepsPerUSPerUS * 
+        stepper->nextStepPeriod_InUS = stepper->currentStepPeriod_InUS + stepper->deceleration_InStepsPerUSPerUS *
         currentStepPeriodSquared * stepper->currentStepPeriod_InUS;
 
-        if (stepper->nextStepPeriod_InUS > stepper->periodOfSlowestStep_InUS)
-            stepper->nextStepPeriod_InUS = stepper->periodOfSlowestStep_InUS;
+        if (stepper->nextStepPeriod_InUS > stepper->decelPeriodOfSlowestStep_InUS)
+            stepper->nextStepPeriod_InUS = stepper->decelPeriodOfSlowestStep_InUS;
     }
 }
 
