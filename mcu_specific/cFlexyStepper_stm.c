@@ -44,7 +44,7 @@ void FlexyStepper_log(const char *format, ...)
         return; // No UART handler attached
     }
 
-	char buffer[64]; // Adjust the buffer size as needed
+	char buffer[96];
 	
     va_list args;     // Declare a variable of type va_list
 	va_start(args, format); // Initialize args to store all values after format

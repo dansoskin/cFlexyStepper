@@ -27,6 +27,17 @@ extern "C" {
 #define POSITIVE_DIRECTION 0
 #define NEGATIVE_DIRECTION 1
 
+/* Result of a timed move. FLEXY_MOVE_OK is the only one where the motor was
+ * actually commanded. */
+typedef enum FlexyStepper_move_status
+{
+	FLEXY_MOVE_OK = 0,
+	FLEXY_MOVE_ALREADY_THERE,	/* distance is under one step, nothing to do */
+	FLEXY_MOVE_BAD_ARG,			/* distance/time not finite, or time <= 0 */
+	FLEXY_MOVE_BAD_SETUP,		/* conversion, accel or decel not positive */
+	FLEXY_MOVE_TOO_FAST			/* time is shorter than the ramps can achieve */
+} FlexyStepper_move_status;
+
 typedef enum cFlexyStepper_homing_sm_states
 {
 	HOMING_IDLE, HOMING_MOVE_TOWARDS_LIMIT, HOMING_DELAY1,
@@ -51,6 +62,8 @@ typedef struct {
         GPIO_TypeDef* enablePort;
         uint16_t enablePin;
     #endif
+
+    bool log_enabled;
     
     // Motion parameters
     float stepsPerMillimeter;
@@ -84,6 +97,10 @@ typedef struct {
     bool should_release;
     char motorName[20];
 
+    float default_speed;
+    float default_acceleration;
+    float default_deceleration;
+
     uint32_t homing_sm_timer;
     cFlexyStepper_homing_sm_states homing_sm_state;
     int homing_direction;
@@ -113,6 +130,15 @@ typedef struct {
 	#define DELAY_MICROS(micros) HAL_DelayMicros(micros)
 #endif
 
+/* Every per-motor trace goes through this rather than calling FlexyStepper_log
+ * directly: it adds the "[name] " prefix and honours that motor's log_enabled
+ * flag, so muting one motor mutes all of its output. `stepper` is evaluated
+ * twice -- pass a plain pointer, never an expression with side effects. */
+#define FlexyStepper_LOG(stepper, fmt, ...)                                    \
+    do {                                                                       \
+        if ((stepper)->log_enabled)                                            \
+            FlexyStepper_log("[%s] " fmt, (stepper)->motorName, ##__VA_ARGS__);\
+    } while (0)
 
 
 //----------------------------------------------------------------
@@ -126,6 +152,9 @@ void FlexyStepper_set_homing(FlexyStepper* stepper,
 							uint8_t* homing_limit_switch_ptr,
 							float new_zero_position);
 void stop_cFlexyStepper_homing_sm(FlexyStepper* stepper);
+
+void FlexyStepper_enable_logging(FlexyStepper* stepper, bool enable);
+bool FlexyStepper_logging_enabled(FlexyStepper* stepper);
 
 #ifdef MCU_ARDUINO
     void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin);
@@ -197,10 +226,36 @@ void FlexyStepper_setSpeed(FlexyStepper* stepper, float speed);
 void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration);
 void FlexyStepper_setDeceleration(FlexyStepper* stepper, float deceleration);
 float FlexyStepper_getTargetSpeed(FlexyStepper* stepper);
+float FlexyStepper_getAcceleration(FlexyStepper* stepper);
+float FlexyStepper_getDeceleration(FlexyStepper* stepper);
 void FlexyStepper_jog(FlexyStepper * stepper, float speed);
+
+void FlexyStepper_setDefaults(FlexyStepper* stepper, float speed, float acceleration, float deceleration);
+void FlexyStepper_restoreDefaults(FlexyStepper* stepper);
+
+float FlexyStepper_getDefaultSpeed(FlexyStepper* stepper);
+float FlexyStepper_getDefaultAcceleration(FlexyStepper* stepper);
+float FlexyStepper_getDefaultDeceleration(FlexyStepper* stepper);
 
 void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanceToMove, bool should_release);
 void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositionToMoveTo, bool should_release);
+
+/* Timed moves: give a target and how long the move should take, and the cruise
+ * speed is solved from the ramps currently set and applied before starting.
+ * Returns FLEXY_MOVE_OK only if the move was actually commanded; every other
+ * status leaves the motor untouched. The solve assumes the motor starts from
+ * rest -- retargeting mid-move still works, but the time will not be honoured.
+ * Speed is left at the solved value afterwards, so follow a timed move with
+ * FlexyStepper_restoreDefaults() when the baseline should come back. */
+FlexyStepper_move_status FlexyStepper_setTimedTargetPositionRelative(FlexyStepper* stepper, float distanceToMove, float seconds, bool should_release);
+FlexyStepper_move_status FlexyStepper_setTimedTargetPosition(FlexyStepper* stepper, float absolutePositionToMoveTo, float seconds, bool should_release);
+
+/* Solve only -- nothing is commanded. Either output may be NULL. speed_out is
+ * the cruise speed in user units; min_seconds_out is the fastest this distance
+ * can be covered under the current ramps, and is written even when the answer
+ * is FLEXY_MOVE_TOO_FAST so a caller can report what it should have asked for. */
+FlexyStepper_move_status FlexyStepper_solveTimedMove(FlexyStepper* stepper, float distance, float seconds, float* speed_out, float* min_seconds_out);
+const char* FlexyStepper_move_status_str(FlexyStepper_move_status status);
 
 void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release);
 void FlexyStepper_loop(FlexyStepper* stepper);

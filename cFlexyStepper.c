@@ -59,11 +59,17 @@ void FlexyStepper_Init(FlexyStepper* stepper, char* name) {
     stepper->directionOfMotion = 0;
     stepper->currentPosition_InSteps = 0;
     stepper->targetPosition_InSteps = 0;
-    
+
+    stepper->log_enabled = true;
+
     // Set default speed
     FlexyStepper_setSpeedInStepsPerSecond(stepper, 200);
     FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, 200.0);
-    
+
+    stepper->default_speed = 200.0;
+    stepper->default_acceleration = 200.0;
+    stepper->default_deceleration = 200.0;
+
     stepper->currentStepPeriod_InUS = 0.0;
     stepper->nextStepPeriod_InUS = 0.0;
 

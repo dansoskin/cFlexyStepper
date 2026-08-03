@@ -24,9 +24,9 @@ FlexyStepper_connectEnablePin(&stepper, EN_GPIO_Port, EN_Pin, true);
 
 // Configure motion parameters
 FlexyStepper_setConversion(&stepper, 3200.0);  // Steps per unit (e.g., steps per revolution or mm)
-FlexyStepper_setAcceleration(&stepper, 10);    // Units per second²
-FlexyStepper_setDeceleration(&stepper, 15);
-FlexyStepper_setSpeed(&stepper, 4);            // Units per second
+
+// Applies speed/accel/decel now and records them as this motor's baseline
+FlexyStepper_setDefaults(&stepper, /*speed=*/4, /*accel=*/10, /*decel=*/15);
 
 // Move 10 units in the positive direction
 FlexyStepper_setTargetPositionRelative(&stepper, 10, true);
@@ -36,6 +36,49 @@ while (1) {
     FlexyStepper_loop(&stepper);
 }
 ```
+
+## Defaults
+
+`FlexyStepper_setDefaults()` records a baseline and applies it. Override speed or
+either ramp freely for one move, then come back with one call:
+
+```c
+FlexyStepper_setSpeed(&stepper, 20);           // fast approach, just this once
+FlexyStepper_setDeceleration(&stepper, 200);
+FlexyStepper_setTargetPosition(&stepper, 90, false);
+// ... move finishes ...
+FlexyStepper_restoreDefaults(&stepper);        // speed, accel and decel all back
+```
+
+To put only part of the baseline back, read it and apply what you want —
+useful when e.g. the operator's chosen speed must survive the move:
+
+```c
+FlexyStepper_setAcceleration(&stepper, FlexyStepper_getDefaultAcceleration(&stepper));
+FlexyStepper_setDeceleration(&stepper, FlexyStepper_getDefaultDeceleration(&stepper));
+```
+
+Note the ordering rule this handles for you: `setAcceleration` resets the decel
+ramp to match itself, so deceleration must always be applied *after* it.
+
+## Logging
+
+Logging is on after `FlexyStepper_Init()`. Every trace carries a `[motorName]`
+prefix and is gated per motor, so a motor commanded at high rate can be muted
+without silencing the others:
+
+```c
+FlexyStepper_enable_logging(&stepper, false);
+for (;;) {                                  // e.g. a cyclic setpoint stream
+    FlexyStepper_setTargetPosition(&stepper, next_setpoint(), false);
+    FlexyStepper_loop(&stepper);
+    if (done) break;
+}
+FlexyStepper_enable_logging(&stepper, true);
+```
+
+The call is idempotent — re-asserting the current state emits nothing, so it is
+safe to call every pass of a loop.
 
 ## License
 

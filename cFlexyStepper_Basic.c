@@ -5,13 +5,54 @@ void FlexyStepper_setConversion(FlexyStepper* stepper, float conversion) {
     stepper->conversion = conversion;
 }
 
+void FlexyStepper_setDefaults(FlexyStepper* stepper, float speed, float acceleration, float deceleration) {
+    stepper->default_speed = speed;
+    stepper->default_acceleration = acceleration;
+    stepper->default_deceleration = deceleration;
+
+    FlexyStepper_LOG(stepper, "Defaults: %.2f / %.2f / %.2f\r\n", speed, acceleration, deceleration);
+    FlexyStepper_restoreDefaults(stepper);
+}
+
+void FlexyStepper_restoreDefaults(FlexyStepper* stepper) {
+    FlexyStepper_setSpeed(stepper, stepper->default_speed);
+    FlexyStepper_setAcceleration(stepper, stepper->default_acceleration);
+    FlexyStepper_setDeceleration(stepper, stepper->default_deceleration);
+}
+
+float FlexyStepper_getDefaultSpeed(FlexyStepper* stepper) {
+    return stepper->default_speed;
+}
+
+float FlexyStepper_getDefaultAcceleration(FlexyStepper* stepper) {
+    return stepper->default_acceleration;
+}
+
+float FlexyStepper_getDefaultDeceleration(FlexyStepper* stepper) {
+    return stepper->default_deceleration;
+}
+
+//-------------------
+void FlexyStepper_enable_logging(FlexyStepper* stepper, bool enable) {
+    if (stepper->log_enabled == enable)
+        return;
+
+    stepper->log_enabled = true;
+    FlexyStepper_LOG(stepper, "Logging %s\r\n", enable ? "on" : "off");
+    stepper->log_enabled = enable;
+}
+
+bool FlexyStepper_logging_enabled(FlexyStepper* stepper) {
+    return stepper->log_enabled;
+}
+
 //-------------------
 float FlexyStepper_getCurrentPosition(FlexyStepper* stepper) {
     return ((float)FlexyStepper_getCurrentPositionInSteps(stepper) / stepper->conversion);
 }
 
 void FlexyStepper_setCurrentPosition(FlexyStepper* stepper, float position) {
-    FlexyStepper_log("[%s] Current Position: %.4f\r\n", stepper->motorName, position);
+    FlexyStepper_LOG(stepper, "Current Position: %.4f\r\n", position);
     FlexyStepper_setCurrentPositionInSteps(stepper, (int32_t)round(position * stepper->conversion));
 }
 
@@ -21,25 +62,17 @@ float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper) {
 }
 
 void FlexyStepper_setSpeed(FlexyStepper* stepper, float speed) {
-    FlexyStepper_log("[%s] Speed: %.4f\r\n", stepper->motorName, speed);
-    // Speed is a magnitude: only |conversion| may scale it. A negative conversion
-    // must invert position/direction, never make the speed negative.
+    FlexyStepper_LOG(stepper, "Speed: %.4f\r\n", speed);
     FlexyStepper_setSpeedInStepsPerSecond(stepper, speed * fabsf(stepper->conversion));
 }
 
 void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration) {
-    FlexyStepper_log("[%s] Acceleration: %.4f\r\n", stepper->motorName, acceleration);
-    // Acceleration must stay positive: a negative value makes sqrt(2*accel) NaN in the
-    // core, which poisons periodOfSlowestStep and makes jog/moves run out of control.
+    FlexyStepper_LOG(stepper, "Acceleration: %.4f\r\n", acceleration);
     FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, acceleration * fabsf(stepper->conversion));
 }
 
-// Deceleration is reset to match acceleration by every setAcceleration call, so
-// this must come second when the two ramps are meant to differ.
 void FlexyStepper_setDeceleration(FlexyStepper* stepper, float deceleration) {
-    FlexyStepper_log("[%s] Deceleration: %.4f\r\n", stepper->motorName, deceleration);
-    // Same reasoning as acceleration: a non-positive value makes sqrt(2*decel)
-    // NaN or infinite and poisons the slow-down ramp.
+    FlexyStepper_LOG(stepper, "Deceleration: %.4f\r\n", deceleration);
     FlexyStepper_setDecelerationInStepsPerSecondPerSecond(stepper, deceleration * fabsf(stepper->conversion));
 }
 
@@ -48,9 +81,20 @@ float FlexyStepper_getTargetSpeed(FlexyStepper* stepper)
 	return stepper->desiredSpeed_InStepsPerSecond / fabsf(stepper->conversion);
 }
 
+float FlexyStepper_getAcceleration(FlexyStepper* stepper)
+{
+	return stepper->acceleration_InStepsPerSecondPerSecond / fabsf(stepper->conversion);
+}
+
+float FlexyStepper_getDeceleration(FlexyStepper* stepper)
+{
+	return stepper->deceleration_InStepsPerSecondPerSecond / fabsf(stepper->conversion);
+}
+
+//-------------------
 void FlexyStepper_jog(FlexyStepper * stepper, float speed)
 {
-	FlexyStepper_log("[%s] Jog: %.4f\r\n", stepper->motorName, speed);
+	FlexyStepper_LOG(stepper, "Jog: %.4f\r\n", speed);
 
     if(speed == 0)
     {
@@ -76,7 +120,7 @@ void FlexyStepper_jog(FlexyStepper * stepper, float speed)
 
 //-------------------
 void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanceToMove, bool should_release) {
-    FlexyStepper_log("[%s] Target Position Relative: %.4f\r\n", stepper->motorName, distanceToMove);
+    FlexyStepper_LOG(stepper, "Target Position Relative: %.4f\r\n", distanceToMove);
     FlexyStepper_en_motor(stepper, 1);
     FlexyStepper_setTargetPositionRelativeInSteps(stepper, (int32_t)round(distanceToMove * stepper->conversion));
     stepper->is_moving = true;
@@ -84,7 +128,7 @@ void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanc
 }
     
 void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositionToMoveTo, bool should_release) {
-    FlexyStepper_log("[%s] Target Position: %.4f\r\n", stepper->motorName, absolutePositionToMoveTo);
+    FlexyStepper_LOG(stepper, "Target Position: %.4f\r\n", absolutePositionToMoveTo);
     FlexyStepper_en_motor(stepper, 1);
     FlexyStepper_setTargetPositionInSteps(stepper, (int32_t)round(absolutePositionToMoveTo * stepper->conversion));
     stepper->is_moving = true;
@@ -92,6 +136,148 @@ void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositio
 }
 
 
+
+//-------------------------------------------------------------------------------
+// Timed moves
+//
+// Under a trapezoidal profile a move of distance d at cruise speed v takes
+//
+//      T(v) = d/v + v/2 * (1/accel + 1/decel)
+//
+// so with k = (1/accel + 1/decel)/2 the cruise speed for a wanted T is a root of
+//
+//      k*v^2 - T*v + d = 0
+//
+// Only the smaller root is a real trapezoid. T(v) bottoms out at v = sqrt(d/k),
+// which is exactly where the cruise phase vanishes and the profile turns
+// triangular; the larger root sits beyond that, where the formula no longer
+// describes the motion. That minimum, T = 2*sqrt(k*d), is also the fastest the
+// move can possibly be done, so any shorter time is rejected rather than
+// silently approximated.
+
+const char* FlexyStepper_move_status_str(FlexyStepper_move_status status) {
+    switch (status) {
+        case FLEXY_MOVE_OK:            return "ok";
+        case FLEXY_MOVE_ALREADY_THERE: return "already at target";
+        case FLEXY_MOVE_BAD_ARG:       return "bad distance or time";
+        case FLEXY_MOVE_BAD_SETUP:     return "conversion/accel/decel not set";
+        case FLEXY_MOVE_TOO_FAST:      return "time too short for the ramps";
+    }
+    return "unknown";
+}
+
+FlexyStepper_move_status FlexyStepper_solveTimedMove(FlexyStepper* stepper,
+                                                    float distance,
+                                                    float seconds,
+                                                    float* speed_out,
+                                                    float* min_seconds_out) {
+    if (!isfinite(distance) || !isfinite(seconds) || seconds <= 0.0f)
+        return FLEXY_MOVE_BAD_ARG;
+
+    const float accel = stepper->acceleration_InStepsPerSecondPerSecond;
+    const float decel = stepper->deceleration_InStepsPerSecondPerSecond;
+    const float scale = fabsf(stepper->conversion);
+
+    if (!(accel > 0.0f) || !(decel > 0.0f) || !(scale > 0.0f))
+        return FLEXY_MOVE_BAD_SETUP;
+
+    /* Solved in steps so the stored ramps are used as-is, with no round trip
+     * through user units. Distance is a magnitude here -- direction is the
+     * target's business, not the speed's. */
+    const float d = fabsf(distance) * scale;
+
+    if (roundf(d) < 1.0f)   /* under half a step: the move would not turn the motor */
+    {
+        if (min_seconds_out)
+            *min_seconds_out = 0.0f;
+        return FLEXY_MOVE_ALREADY_THERE;
+    }
+
+    const float k = 0.5f * (1.0f / accel + 1.0f / decel);
+    const float min_seconds = 2.0f * sqrtf(k * d);
+
+    if (min_seconds_out)
+        *min_seconds_out = min_seconds;
+
+    if (seconds < min_seconds)
+        return FLEXY_MOVE_TOO_FAST;
+
+    /* The min_seconds test above is the single authority on feasibility, so
+     * clamp instead of letting float noise at seconds == min_seconds hand a
+     * negative value to sqrtf. At disc == 0 this yields the triangular peak
+     * speed sqrt(d/k), which is the correct answer for that case. */
+    float disc = seconds * seconds - 4.0f * k * d;
+    if (disc < 0.0f)
+        disc = 0.0f;
+
+    const float speedInStepsPerSecond = (seconds - sqrtf(disc)) / (2.0f * k);
+
+    if (!(speedInStepsPerSecond > 0.0f))
+        return FLEXY_MOVE_TOO_FAST;
+
+    if (speed_out)
+        *speed_out = speedInStepsPerSecond / scale;
+
+    return FLEXY_MOVE_OK;
+}
+
+/* Shared tail: solve, report, and only then command. Nothing is applied unless
+ * the whole solve succeeds, so a rejected move cannot leave the motor holding a
+ * half-configured speed. */
+static FlexyStepper_move_status FlexyStepper_startTimedMove(FlexyStepper* stepper,
+                                                           float distance,
+                                                           float target,
+                                                           float seconds,
+                                                           bool relative,
+                                                           bool should_release) {
+    float speed = 0.0f;
+    float min_seconds = 0.0f;
+
+    FlexyStepper_move_status status =
+        FlexyStepper_solveTimedMove(stepper, distance, seconds, &speed, &min_seconds);
+
+    if (status == FLEXY_MOVE_TOO_FAST) {
+        FlexyStepper_LOG(stepper, "Timed move: %.3fs needs >= %.3fs\r\n",
+                         seconds, min_seconds);
+        return status;
+    }
+
+    if (status != FLEXY_MOVE_OK) {
+        FlexyStepper_LOG(stepper, "Timed move: %s\r\n",
+                         FlexyStepper_move_status_str(status));
+        return status;
+    }
+
+    FlexyStepper_LOG(stepper, "Timed move: %.4f in %.3fs\r\n", distance, seconds);
+    FlexyStepper_setSpeed(stepper, speed);
+
+    if (relative)
+        FlexyStepper_setTargetPositionRelative(stepper, distance, should_release);
+    else
+        FlexyStepper_setTargetPosition(stepper, target, should_release);
+
+    return FLEXY_MOVE_OK;
+}
+
+FlexyStepper_move_status FlexyStepper_setTimedTargetPositionRelative(FlexyStepper* stepper,
+                                                                    float distanceToMove,
+                                                                    float seconds,
+                                                                    bool should_release) {
+    return FlexyStepper_startTimedMove(stepper, distanceToMove, 0.0f, seconds,
+                                       /*relative=*/true, should_release);
+}
+
+FlexyStepper_move_status FlexyStepper_setTimedTargetPosition(FlexyStepper* stepper,
+                                                            float absolutePositionToMoveTo,
+                                                            float seconds,
+                                                            bool should_release) {
+    /* Distance comes off the live position, so the solve accounts for where the
+     * motor actually is rather than where the last command aimed it. */
+    const float distance = absolutePositionToMoveTo - FlexyStepper_getCurrentPosition(stepper);
+
+    return FlexyStepper_startTimedMove(stepper, distance, absolutePositionToMoveTo, seconds,
+                                       /*relative=*/false, should_release);
+}
 
 //-------------------------------------------------------------------------------
 
@@ -121,7 +307,7 @@ void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release) {
     }
 
     FlexyStepper_loop(stepper);
-    FlexyStepper_log("[%s] Estop\r\n", stepper->motorName);
+    FlexyStepper_LOG(stepper, "Estop\r\n");
 
 }
 
@@ -135,7 +321,7 @@ void FlexyStepper_loop(FlexyStepper* stepper) {
         }
         else
         {
-            FlexyStepper_log("[%s] movement finished\r\n", stepper->motorName);
+            FlexyStepper_LOG(stepper, "movement finished\r\n");
             stepper->is_moving = false;
 
             if(stepper->should_release)
