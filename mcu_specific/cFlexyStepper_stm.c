@@ -31,36 +31,6 @@ void HAL_DelayMicros(uint32_t micros) {
     while ((HAL_GetMicros() - start) < micros);
 }
 
-//-------------------------------------------------
-UART_HandleTypeDef * logger_uart = NULL;
-
-void FlexyStepper_attach_logger(UART_HandleTypeDef * uart) {
-    logger_uart = uart;
-}
-
-void FlexyStepper_log(const char *format, ...)
-{
-    if(logger_uart == NULL) {
-        return; // No UART handler attached
-    }
-
-	char buffer[96];
-	
-    va_list args;     // Declare a variable of type va_list
-	va_start(args, format); // Initialize args to store all values after format
-	
-    // Convert float values in the format string to double
-    // This ensures proper handling of floating-point values
-    int len = vsnprintf(buffer, sizeof(buffer), format, args); // Format the string with the arguments
-	
-    va_end(args); // Clean up the va_list variable
-
-    // Check if formatting was successful
-    if (len > 0) {
-        HAL_UART_Transmit(logger_uart, (uint8_t *) buffer, len, 0xFFFF);
-    }
-}
-
 //-------------------------------------------------------
 
 //

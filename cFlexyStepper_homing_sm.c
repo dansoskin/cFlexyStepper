@@ -14,7 +14,7 @@ const char *cFlexyStepper_homing_sm_states_strings[] =
 void set_cFlexyStepper_homing_sm_state(FlexyStepper* stepper, cFlexyStepper_homing_sm_states st)
 {
 	stepper->homing_sm_state = st;
-	FlexyStepper_LOG(stepper, "homing_sm_state: %s\r\n", cFlexyStepper_homing_sm_states_strings[stepper->homing_sm_state]);
+	FlexyStepper_logf(stepper, "homing_sm_state: %s\r\n", cFlexyStepper_homing_sm_states_strings[stepper->homing_sm_state]);
 	stepper->homing_sm_timer = GET_MICROS;
 }
 

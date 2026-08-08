@@ -1,6 +1,46 @@
 #include "cFlexyStepper.h"
 
+//-------------------
+static FlexyStepper_log_fn_t log_fn = NULL;
 
+void FlexyStepper_attach_logger(FlexyStepper_log_fn_t fn) {
+    log_fn = fn;
+}
+
+void FlexyStepper_logf(FlexyStepper* stepper, const char *format, ...) {
+    if (!stepper->log_enabled || log_fn == NULL) {
+        return;
+    }
+
+    char buffer[96];
+
+    int n = snprintf(buffer, sizeof(buffer), "[%s] ", stepper->motorName);
+    if (n < 0 || (size_t)n >= sizeof(buffer)) {
+        n = 0;
+    }
+
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer + n, sizeof(buffer) - (size_t)n, format, args);
+    va_end(args);
+
+    log_fn(buffer);
+}
+
+void FlexyStepper_enable_logging(FlexyStepper* stepper, bool enable) {
+    if (stepper->log_enabled == enable)
+        return;
+
+    stepper->log_enabled = true;
+    FlexyStepper_logf(stepper, "Logging %s\r\n", enable ? "on" : "off");
+    stepper->log_enabled = enable;
+}
+
+bool FlexyStepper_logging_enabled(FlexyStepper* stepper) {
+    return stepper->log_enabled;
+}
+
+//-------------------
 void FlexyStepper_setConversion(FlexyStepper* stepper, float conversion) {
     stepper->conversion = conversion;
 }
@@ -10,7 +50,7 @@ void FlexyStepper_setDefaults(FlexyStepper* stepper, float speed, float accelera
     stepper->default_acceleration = acceleration;
     stepper->default_deceleration = deceleration;
 
-    FlexyStepper_LOG(stepper, "Defaults: %.2f / %.2f / %.2f\r\n", speed, acceleration, deceleration);
+    FlexyStepper_logf(stepper, "Defaults: %.2f / %.2f / %.2f\r\n", speed, acceleration, deceleration);
     FlexyStepper_restoreDefaults(stepper);
 }
 
@@ -33,26 +73,12 @@ float FlexyStepper_getDefaultDeceleration(FlexyStepper* stepper) {
 }
 
 //-------------------
-void FlexyStepper_enable_logging(FlexyStepper* stepper, bool enable) {
-    if (stepper->log_enabled == enable)
-        return;
-
-    stepper->log_enabled = true;
-    FlexyStepper_LOG(stepper, "Logging %s\r\n", enable ? "on" : "off");
-    stepper->log_enabled = enable;
-}
-
-bool FlexyStepper_logging_enabled(FlexyStepper* stepper) {
-    return stepper->log_enabled;
-}
-
-//-------------------
 float FlexyStepper_getCurrentPosition(FlexyStepper* stepper) {
     return ((float)FlexyStepper_getCurrentPositionInSteps(stepper) / stepper->conversion);
 }
 
 void FlexyStepper_setCurrentPosition(FlexyStepper* stepper, float position) {
-    FlexyStepper_LOG(stepper, "Current Position: %.4f\r\n", position);
+    FlexyStepper_logf(stepper, "Current Position: %.4f\r\n", position);
     FlexyStepper_setCurrentPositionInSteps(stepper, (int32_t)round(position * stepper->conversion));
 }
 
@@ -62,17 +88,17 @@ float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper) {
 }
 
 void FlexyStepper_setSpeed(FlexyStepper* stepper, float speed) {
-    FlexyStepper_LOG(stepper, "Speed: %.4f\r\n", speed);
+    FlexyStepper_logf(stepper, "Speed: %.4f\r\n", speed);
     FlexyStepper_setSpeedInStepsPerSecond(stepper, speed * fabsf(stepper->conversion));
 }
 
 void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration) {
-    FlexyStepper_LOG(stepper, "Acceleration: %.4f\r\n", acceleration);
+    FlexyStepper_logf(stepper, "Acceleration: %.4f\r\n", acceleration);
     FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, acceleration * fabsf(stepper->conversion));
 }
 
 void FlexyStepper_setDeceleration(FlexyStepper* stepper, float deceleration) {
-    FlexyStepper_LOG(stepper, "Deceleration: %.4f\r\n", deceleration);
+    FlexyStepper_logf(stepper, "Deceleration: %.4f\r\n", deceleration);
     FlexyStepper_setDecelerationInStepsPerSecondPerSecond(stepper, deceleration * fabsf(stepper->conversion));
 }
 
@@ -94,7 +120,7 @@ float FlexyStepper_getDeceleration(FlexyStepper* stepper)
 //-------------------
 void FlexyStepper_jog(FlexyStepper * stepper, float speed)
 {
-	FlexyStepper_LOG(stepper, "Jog: %.4f\r\n", speed);
+	FlexyStepper_logf(stepper, "Jog: %.4f\r\n", speed);
 
     if(speed == 0)
     {
@@ -120,7 +146,7 @@ void FlexyStepper_jog(FlexyStepper * stepper, float speed)
 
 //-------------------
 void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanceToMove, bool should_release) {
-    FlexyStepper_LOG(stepper, "Target Position Relative: %.4f\r\n", distanceToMove);
+    FlexyStepper_logf(stepper, "Target Position Relative: %.4f\r\n", distanceToMove);
     FlexyStepper_en_motor(stepper, 1);
     FlexyStepper_setTargetPositionRelativeInSteps(stepper, (int32_t)round(distanceToMove * stepper->conversion));
     stepper->is_moving = true;
@@ -128,7 +154,7 @@ void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanc
 }
     
 void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositionToMoveTo, bool should_release) {
-    FlexyStepper_LOG(stepper, "Target Position: %.4f\r\n", absolutePositionToMoveTo);
+    FlexyStepper_logf(stepper, "Target Position: %.4f\r\n", absolutePositionToMoveTo);
     FlexyStepper_en_motor(stepper, 1);
     FlexyStepper_setTargetPositionInSteps(stepper, (int32_t)round(absolutePositionToMoveTo * stepper->conversion));
     stepper->is_moving = true;
@@ -237,18 +263,18 @@ static FlexyStepper_move_status FlexyStepper_startTimedMove(FlexyStepper* steppe
         FlexyStepper_solveTimedMove(stepper, distance, seconds, &speed, &min_seconds);
 
     if (status == FLEXY_MOVE_TOO_FAST) {
-        FlexyStepper_LOG(stepper, "Timed move: %.3fs needs >= %.3fs\r\n",
+        FlexyStepper_logf(stepper, "Timed move: %.3fs needs >= %.3fs\r\n",
                          seconds, min_seconds);
         return status;
     }
 
     if (status != FLEXY_MOVE_OK) {
-        FlexyStepper_LOG(stepper, "Timed move: %s\r\n",
+        FlexyStepper_logf(stepper, "Timed move: %s\r\n",
                          FlexyStepper_move_status_str(status));
         return status;
     }
 
-    FlexyStepper_LOG(stepper, "Timed move: %.4f in %.3fs\r\n", distance, seconds);
+    FlexyStepper_logf(stepper, "Timed move: %.4f in %.3fs\r\n", distance, seconds);
     FlexyStepper_setSpeed(stepper, speed);
 
     if (relative)
@@ -307,7 +333,7 @@ void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release) {
     }
 
     FlexyStepper_loop(stepper);
-    FlexyStepper_LOG(stepper, "Estop\r\n");
+    FlexyStepper_logf(stepper, "Estop\r\n");
 
 }
 
@@ -321,7 +347,7 @@ void FlexyStepper_loop(FlexyStepper* stepper) {
         }
         else
         {
-            FlexyStepper_LOG(stepper, "movement finished\r\n");
+            FlexyStepper_logf(stepper, "movement finished\r\n");
             stepper->is_moving = false;
 
             if(stepper->should_release)

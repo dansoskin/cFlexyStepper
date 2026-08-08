@@ -111,9 +111,21 @@ typedef struct {
     float speed_after_homing;
 } FlexyStepper;
 
-#ifdef MCU_ARDUINO
-    void FlexyStepper_log(const char *format, ...);
+// Logging sink: the application supplies a callback that transports a
+// fully-formatted line (UART, Serial, whatever); the driver never touches
+// hardware directly.
+typedef void (*FlexyStepper_log_fn_t)(const char *message);
 
+void FlexyStepper_attach_logger(FlexyStepper_log_fn_t log_fn);
+
+// Per-motor trace: adds the "[name] " prefix and honours that motor's
+// log_enabled flag, so muting one motor mutes all of its output.
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((format(printf, 2, 3)))
+#endif
+void FlexyStepper_logf(FlexyStepper* stepper, const char *format, ...);
+
+#ifdef MCU_ARDUINO
 	#define WRITE_PIN(port, pin, value) digitalWrite(pin, value)
     #define GET_MICROS micros()
     #define DELAY_MICROS(micros) delayMicroseconds(micros)
@@ -122,23 +134,11 @@ typedef struct {
     void HAL_DelayMicros(uint32_t micros);
 
     void FlexyStepper_attach_timer_for_micros(TIM_HandleTypeDef* htim);
-    void FlexyStepper_attach_logger(UART_HandleTypeDef * uart);
-    void FlexyStepper_log(const char *format, ...);
 
 	#define WRITE_PIN(port, pin, value) HAL_GPIO_WritePin(port, pin, value)
 	#define GET_MICROS HAL_GetMicros()
 	#define DELAY_MICROS(micros) HAL_DelayMicros(micros)
 #endif
-
-/* Every per-motor trace goes through this rather than calling FlexyStepper_log
- * directly: it adds the "[name] " prefix and honours that motor's log_enabled
- * flag, so muting one motor mutes all of its output. `stepper` is evaluated
- * twice -- pass a plain pointer, never an expression with side effects. */
-#define FlexyStepper_LOG(stepper, fmt, ...)                                    \
-    do {                                                                       \
-        if ((stepper)->log_enabled)                                            \
-            FlexyStepper_log("[%s] " fmt, (stepper)->motorName, ##__VA_ARGS__);\
-    } while (0)
 
 
 //----------------------------------------------------------------
@@ -217,22 +217,25 @@ void FlexyStepper_DeterminePeriodOfNextStep(FlexyStepper* stepper);
 
 // Basic
 void FlexyStepper_setConversion(FlexyStepper* stepper, float conversion);
+
 float FlexyStepper_getCurrentPosition(FlexyStepper* stepper);
 void FlexyStepper_setCurrentPosition(FlexyStepper* stepper, float position);
 
 float FlexyStepper_getCurrentVelocity(FlexyStepper* stepper);
 void FlexyStepper_setSpeed(FlexyStepper* stepper, float speed);
+
 /* Sets both ramps. Call before FlexyStepper_setDeceleration(), not after. */
 void FlexyStepper_setAcceleration(FlexyStepper* stepper, float acceleration);
-void FlexyStepper_setDeceleration(FlexyStepper* stepper, float deceleration);
-float FlexyStepper_getTargetSpeed(FlexyStepper* stepper);
 float FlexyStepper_getAcceleration(FlexyStepper* stepper);
+
+void FlexyStepper_setDeceleration(FlexyStepper* stepper, float deceleration);
 float FlexyStepper_getDeceleration(FlexyStepper* stepper);
+
+float FlexyStepper_getTargetSpeed(FlexyStepper* stepper);
 void FlexyStepper_jog(FlexyStepper * stepper, float speed);
 
 void FlexyStepper_setDefaults(FlexyStepper* stepper, float speed, float acceleration, float deceleration);
 void FlexyStepper_restoreDefaults(FlexyStepper* stepper);
-
 float FlexyStepper_getDefaultSpeed(FlexyStepper* stepper);
 float FlexyStepper_getDefaultAcceleration(FlexyStepper* stepper);
 float FlexyStepper_getDefaultDeceleration(FlexyStepper* stepper);
@@ -267,6 +270,11 @@ void set_cFlexyStepper_homing_sm_state(FlexyStepper* stepper, cFlexyStepper_homi
 cFlexyStepper_homing_sm_states get_cFlexyStepper_homing_sm_state(FlexyStepper* stepper);
 void start_cFlexyStepper_homing_sm(FlexyStepper* stepper);
 void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper);
+
+//----------------------------------------------------------------
+void FlexyStepper_decode_menu(char * buffer, size_t buffer_size);
+void FlexyStepper_decode(FlexyStepper * stpr, char cmd, char* arg);
+
 
 #ifdef __cplusplus
 }
