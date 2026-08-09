@@ -109,6 +109,15 @@ typedef struct {
     uint8_t* homing_limit_switch_ptr;
     float zero_pos;
     float speed_after_homing;
+
+    /* Passthrough streaming. The saved_* fields hold what the axis was
+     * configured with before the stream took over, so leaving the mode restores
+     * it exactly. */
+    bool  passthrough;
+    bool  passthrough_saved_logging;
+    float passthrough_saved_speed;
+    float passthrough_saved_acceleration;
+    float passthrough_saved_deceleration;
 } FlexyStepper;
 
 // Logging sink: the application supplies a callback that transports a
@@ -262,6 +271,35 @@ const char* FlexyStepper_move_status_str(FlexyStepper_move_status status);
 
 void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release);
 void FlexyStepper_loop(FlexyStepper* stepper);
+
+//----------------------------------------------------------------
+// Passthrough streaming
+//
+// For an axis whose position is dictated by an outside calculation rather than
+// by a destination of its own -- a coordinated motion recomputed every few
+// milliseconds. The trapezoid is bypassed: each setpoint is a position to be at
+// *now* and the rate to get there at, and the axis simply runs at that rate.
+//
+//   FlexyStepper_beginPassthrough(&ax);
+//   /* every tick, e.g. 200 Hz */
+//   FlexyStepper_streamSetpoint(&ax, position, rate);
+//   /* every pass of the main loop, as usual */
+//   FlexyStepper_loop(&ax);
+//   /* when the sequence ends */
+//   FlexyStepper_endPassthrough(&ax);
+//
+// begin mutes this axis's logging and end restores it: one log line blocks for
+// milliseconds, which at streaming rates is dozens of missed steps.
+//----------------------------------------------------------------
+
+void FlexyStepper_beginPassthrough(FlexyStepper* stepper);
+void FlexyStepper_endPassthrough(FlexyStepper* stepper);
+bool FlexyStepper_inPassthrough(FlexyStepper* stepper);
+
+/* One streamed setpoint. `position` is absolute, in user units. `rate` is the
+ * speed to travel at, signed or not -- direction comes from the target, so only
+ * the magnitude is used. Ignored unless the axis is in passthrough. */
+void FlexyStepper_streamSetpoint(FlexyStepper* stepper, float position, float rate);
 
 //----------------------------------------------------------------
 
