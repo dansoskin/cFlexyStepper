@@ -43,10 +43,26 @@
 // Because the ramps follow v, this holds at every rate in a sweep, which no
 // fixed pair of values can do.
 //
+// One caveat, and it bites: v here must be the larger of the rate just
+// commanded and the rate the axis is actually travelling at. Deriving the ramps
+// from the command alone leaves the axis unable to stop at the moment the
+// command drops away underneath it. See streamSetpoint.
+//
 
 /* Small enough to be indistinguishable from stopped, large enough to keep
  * 1e6/v and v^2/2 finite when a stream commands a rate of exactly zero. */
 #define PASSTHROUGH_MIN_STEPS_PER_SECOND    (1.0f)
+
+/* Seconds over which a standing position error is closed. The feedforward says
+ * how fast the setpoint is moving; it says nothing about being in the wrong
+ * place to begin with, so an axis fed a pure feedforward has no reason to ever
+ * catch up. Adding error/TAU to the commanded speed gives it one.
+ *
+ * Short enough to close a gap promptly, long enough that the extra speed is
+ * small next to the feedforward once tracking. The result is capped -- see
+ * streamSetpoint -- so a large error slews at the axis's own speed limit rather
+ * than at whatever error/TAU happens to work out to. */
+#define PASSTHROUGH_CATCHUP_SECONDS         (0.05f)
 
 void FlexyStepper_beginPassthrough(FlexyStepper* stepper)
 {
@@ -119,9 +135,36 @@ void FlexyStepper_streamSetpoint(FlexyStepper* stepper, float position, float ra
     if (!(scale > 0.0f) || !isfinite(position) || !isfinite(rate))
         return;
 
+    const int32_t target = (int32_t)lroundf(position * stepper->conversion);
+
     /* A magnitude: which way to turn is settled by the target relative to the
      * current position, so a signed rate would only fight it. */
-    float v = fabsf(rate) * scale;
+    const float feedforward = fabsf(rate) * scale;
+
+    /* Feedforward alone is only ever enough to keep pace with a setpoint the
+     * axis is already sitting on. Start a sequence with the mechanism somewhere
+     * the masters do not believe it to be -- an aborted run, a hand jog, a fresh
+     * datum -- and the error stands there forever: the rate is right, the place
+     * is wrong, and nothing in the command says so.
+     *
+     * Worse, at the start of a move the feedforward is near zero, so the whole
+     * commanded speed collapses to the floor, and with it the acceleration and
+     * therefore periodOfSlowestStep -- which is the delay before the first step
+     * from rest. Measured: a full second of dead time before the axis so much as
+     * twitched, while the master ran away from it. */
+    const int32_t error_steps = target - stepper->currentPosition_InSteps;
+    const float error = fabsf((float)error_steps);
+
+    float v = feedforward + error / PASSTHROUGH_CATCHUP_SECONDS;
+
+    /* Capped at the speed this axis was configured with before the stream took
+     * over, so closing a large gap is a deliberate slew at a known rate rather
+     * than a lunge. Never below the feedforward though: during a fast sweep the
+     * feedforward legitimately exceeds the axis's ordinary working speed, and
+     * clamping to that would throttle the very motion being tracked. */
+    const float limit = fmaxf(feedforward, stepper->passthrough_saved_speed * scale);
+    if (v > limit)
+        v = limit;
 
     if (!(v > PASSTHROUGH_MIN_STEPS_PER_SECOND))
         v = PASSTHROUGH_MIN_STEPS_PER_SECOND;
@@ -133,9 +176,37 @@ void FlexyStepper_streamSetpoint(FlexyStepper* stepper, float position, float ra
     stepper->desiredSpeed_InStepsPerSecond = v;
     stepper->desiredPeriod_InUSPerStep     = 1000000.0f / v;
 
-    /* The whole of passthrough, derived at the top of this file. */
-    FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, 0.5f * v * v);
+    /* The ramps follow v^2/2 as derived at the top of this file -- but sized
+     * against whichever is larger, the speed just commanded or the speed the
+     * axis is actually travelling at.
+     *
+     * The two agree for as long as the stream is following something that
+     * moves. They come apart the instant the thing being followed stops: the
+     * feedforward drops to zero while the motor is still running at full rate,
+     * and a deceleration derived from that new near-zero command is far too
+     * weak to stop it. DeterminePeriodOfNextStep's "moving away from the
+     * target" branch then takes the decelerate path instead of reversing,
+     *
+     *     if (currentStepPeriod_InUS < decelPeriodOfSlowestStep_InUS)
+     *         slowDownFlag = true;
+     *     else
+     *         directionOfMotion = -1;
+     *
+     * because the collapsed ramp puts decelPeriodOfSlowestStep enormously above
+     * the period the axis is actually stepping at. The axis coasts straight past
+     * the setpoint, shedding speed so slowly it would take minutes to stop.
+     * Measured in simulation: 1.51 degrees of overshoot and still climbing at
+     * the end of a tilt move, against 0.05 with this line as it stands. */
+    float v_ramp = v;
+    if (stepper->currentStepPeriod_InUS > 0.0f)
+    {
+        const float actual = 1000000.0f / stepper->currentStepPeriod_InUS;
+        if (actual > v_ramp)
+            v_ramp = actual;
+    }
 
-    stepper->targetPosition_InSteps = (int32_t)lroundf(position * stepper->conversion);
+    FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, 0.5f * v_ramp * v_ramp);
+
+    stepper->targetPosition_InSteps = target;
     stepper->is_moving = true;
 }
