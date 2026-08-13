@@ -45,7 +45,6 @@ extern "C" void FlexyStepper_connectFaultClearPin(FlexyStepper* stepper, uint8_t
 {
     stepper->faultClearPin = pin;
     stepper->inverse_faultClearPin = inverse;
-    stepper->fault_clear_pulse_active = false;
 
     pinMode(pin, OUTPUT);
     digitalWrite(pin, inverse ? HIGH : LOW);

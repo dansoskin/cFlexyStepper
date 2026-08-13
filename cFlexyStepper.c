@@ -78,7 +78,6 @@ void FlexyStepper_Init(FlexyStepper* stepper, char* name) {
 
     stepper->fault_pin_connected = false;
     stepper->fault_clear_pin_connected = false;
-    stepper->fault_clear_pulse_active = false;
     stepper->fault_pin_was_active = false;
     stepper->fault_count = 0;
     stepper->last_fault_us = 0;

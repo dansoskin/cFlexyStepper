@@ -132,8 +132,6 @@ typedef struct {
     bool inverse_faultPin;
     bool fault_clear_pin_connected;
     bool inverse_faultClearPin;
-    bool fault_clear_pulse_active;
-    uint32_t fault_clear_pulse_start_us;
     /* Debounce: when the pin first read active, and whether it read active on
      * the previous sample at all. */
     bool fault_pin_was_active;
@@ -332,19 +330,18 @@ void FlexyStepper_loop(FlexyStepper* stepper);
 // FlexyStepper_loop() samples the fault pin (once connected) and, after the
 // debounce window, estops the axis, releases the motor and latches
 // FLEXY_STATUS_FAULT. While latched, every motion command is refused.
-// FlexyStepper_clearFault() starts a reset pulse on the clear pin; the loop
-// drops the pin after FLEXY_FAULT_CLEAR_PULSE_US and, if the fault pin then
-// reads clean, releases the latch back to IDLE -- a driver still in alarm just
-// re-latches. Clearing a fault does NOT re-home: position is not to be trusted
-// after a driver alarm, and what to do about that is the application's call.
+// FlexyStepper_clearFault() pulses the clear pin and drops the latch back to
+// IDLE -- a driver still in alarm simply re-latches on the next loop pass.
+// Clearing a fault does NOT re-home: position is not to be trusted after a
+// driver alarm, and what to do about that is the application's call.
 //----------------------------------------------------------------
 
 FlexyStepper_status FlexyStepper_getStatus(FlexyStepper* stepper);
 bool FlexyStepper_isMoving(FlexyStepper* stepper);
 const char* FlexyStepper_status_str(FlexyStepper_status status);
 
-/* Non-blocking: returns immediately, the loop finishes the pulse. Ignored when
- * no clear pin is connected or a pulse is already running. */
+/* Blocking: holds the clear pin active for FLEXY_FAULT_CLEAR_PULSE_US (10 ms)
+ * before returning. Ignored when no clear pin is connected. */
 void FlexyStepper_clearFault(FlexyStepper* stepper);
 
 //----------------------------------------------------------------

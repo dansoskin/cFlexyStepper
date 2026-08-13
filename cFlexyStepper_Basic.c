@@ -403,36 +403,22 @@ void FlexyStepper_clearFault(FlexyStepper* stepper) {
         FlexyStepper_logf(stepper, "clear fault: no clear pin connected\r\n");
         return;
     }
-    if (stepper->fault_clear_pulse_active)
-        return;
 
     FlexyStepper_logf(stepper, "clearing fault\r\n");
     FlexyStepper_writeFaultClearPin(stepper, true);
-    stepper->fault_clear_pulse_start_us = GET_MICROS;
-    stepper->fault_clear_pulse_active = true;
+    DELAY_MICROS(FLEXY_FAULT_CLEAR_PULSE_US);
+    FlexyStepper_writeFaultClearPin(stepper, false);
+
+    /* Drop the latch on faith: if the driver is still in alarm, the next loop
+     * pass just latches FAULT again through the ordinary debounce. */
+    stepper->fault_pin_was_active = false;
+    if (stepper->status == FLEXY_STATUS_FAULT) {
+        stepper->status = FLEXY_STATUS_IDLE;
+        FlexyStepper_logf(stepper, "fault cleared\r\n");
+    }
 }
 
 static void FlexyStepper_serviceFault(FlexyStepper* stepper) {
-    if (stepper->fault_clear_pulse_active) {
-        /* While the reset pulse is on the wire the driver's alarm output means
-         * nothing, so sampling is suspended until the pulse ends. */
-        if (GET_MICROS - stepper->fault_clear_pulse_start_us < FLEXY_FAULT_CLEAR_PULSE_US)
-            return;
-
-        FlexyStepper_writeFaultClearPin(stepper, false);
-        stepper->fault_clear_pulse_active = false;
-        stepper->fault_pin_was_active = false;  /* debounce restarts clean */
-
-        if (stepper->status == FLEXY_STATUS_FAULT &&
-            (!stepper->fault_pin_connected || !FlexyStepper_faultPinActive(stepper))) {
-            stepper->status = FLEXY_STATUS_IDLE;
-            FlexyStepper_logf(stepper, "fault cleared\r\n");
-        }
-        /* A driver still in alarm re-latches through the sampling below on the
-         * next pass. */
-        return;
-    }
-
     if (!stepper->fault_pin_connected)
         return;
 

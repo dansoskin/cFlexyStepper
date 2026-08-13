@@ -80,7 +80,6 @@ void FlexyStepper_connectFaultClearPin(FlexyStepper* stepper, GPIO_TypeDef* port
     stepper->faultClearPort = port;
     stepper->faultClearPin = pin;
     stepper->inverse_faultClearPin = inverse;
-    stepper->fault_clear_pulse_active = false;
 
     HAL_GPIO_WritePin(port, pin, inverse ? GPIO_PIN_SET : GPIO_PIN_RESET);
     stepper->fault_clear_pin_connected = true;
