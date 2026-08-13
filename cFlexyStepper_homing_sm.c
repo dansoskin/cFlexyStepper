@@ -58,6 +58,15 @@ void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper)
 	if(stepper->homing_direction == 0)	//homing not set
 		return;
 
+	/* A fault estops the axis, so any move the sequence is waiting on will
+	 * never complete -- bail out instead of waiting forever. */
+	if (stepper->status == FLEXY_STATUS_FAULT &&
+		stepper->homing_sm_state != HOMING_IDLE &&
+		stepper->homing_sm_state != HOMING_ERROR)
+	{
+		set_cFlexyStepper_homing_sm_state(stepper, HOMING_ERROR);
+	}
+
 	switch (stepper->homing_sm_state)
 	{
 		case HOMING_IDLE:
@@ -106,7 +115,7 @@ void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper)
 			break;
 
 		case HOMING_ADJUST_POSITION:
-			if (!stepper->is_moving)
+			if (!FlexyStepper_isMoving(stepper))
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_DELAY3);
 			}

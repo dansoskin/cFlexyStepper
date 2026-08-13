@@ -73,6 +73,16 @@ void FlexyStepper_Init(FlexyStepper* stepper, char* name) {
     stepper->currentStepPeriod_InUS = 0.0;
     stepper->nextStepPeriod_InUS = 0.0;
 
+    stepper->status = FLEXY_STATUS_IDLE;
+    stepper->should_release = false;
+
+    stepper->fault_pin_connected = false;
+    stepper->fault_clear_pin_connected = false;
+    stepper->fault_clear_pulse_active = false;
+    stepper->fault_pin_was_active = false;
+    stepper->fault_count = 0;
+    stepper->last_fault_us = 0;
+
     // Save the name of the motor
     strncpy(stepper->motorName, name, sizeof(stepper->motorName) - 1);
     stepper->motorName[sizeof(stepper->motorName) - 1] = '\0'; // Ensure null termination

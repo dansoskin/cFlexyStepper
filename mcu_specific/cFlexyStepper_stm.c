@@ -64,4 +64,26 @@ void FlexyStepper_connectEnablePin(FlexyStepper* stepper, GPIO_TypeDef* port, ui
     FlexyStepper_en_motor(stepper, 0);
 }
 
+/* Driver alarm input. The pin itself is expected to be configured as an input
+ * by CubeMX; inverse = true means the alarm is active low. */
+void FlexyStepper_connectFaultPin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse) {
+    stepper->faultPort = port;
+    stepper->faultPin = pin;
+    stepper->inverse_faultPin = inverse;
+    stepper->fault_pin_was_active = false;
+    stepper->fault_pin_connected = true;
+}
+
+/* Driver reset output, pulsed by FlexyStepper_clearFault(). Parked at its
+ * inactive level here so connecting it never resets the driver by accident. */
+void FlexyStepper_connectFaultClearPin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse) {
+    stepper->faultClearPort = port;
+    stepper->faultClearPin = pin;
+    stepper->inverse_faultClearPin = inverse;
+    stepper->fault_clear_pulse_active = false;
+
+    HAL_GPIO_WritePin(port, pin, inverse ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    stepper->fault_clear_pin_connected = true;
+}
+
 #endif

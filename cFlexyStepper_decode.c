@@ -19,7 +19,9 @@ void FlexyStepper_decode_menu(char * buffer, size_t buffer_size)
         "T <position> - Move to absolute position\n"
         "F - Restore default speed, acceleration, and deceleration\n"
         "k - Stop at target position\n"
-        "K - Emergency stop and release motor\n");
+        "K - Emergency stop and release motor\n"
+        "s - Get status and fault count\n"
+        "C - Clear fault (pulse the clear pin)\n");
 }
 
 void FlexyStepper_decode(FlexyStepper * stpr, char cmd, char* arg)
@@ -84,6 +86,16 @@ void FlexyStepper_decode(FlexyStepper * stpr, char cmd, char* arg)
 
         case 'K':
             FlexyStepper_Estop(stpr, true);
+            break;
+
+        case 's':
+            FlexyStepper_logf(stpr, "Status: %s, faults: %lu\n",
+                              FlexyStepper_status_str(FlexyStepper_getStatus(stpr)),
+                              (unsigned long)stpr->fault_count);
+            break;
+
+        case 'C':
+            FlexyStepper_clearFault(stpr);
             break;
 
 

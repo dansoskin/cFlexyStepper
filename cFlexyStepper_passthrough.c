@@ -106,7 +106,10 @@ void FlexyStepper_endPassthrough(FlexyStepper* stepper)
     stepper->directionOfMotion      = 0;
     stepper->currentStepPeriod_InUS = 0.0f;
     stepper->nextStepPeriod_InUS    = 0.0f;
-    stepper->is_moving              = false;
+    /* Energised and holding -- unless a fault latched mid-stream, which must
+     * survive leaving the mode. */
+    if (stepper->status != FLEXY_STATUS_FAULT)
+        stepper->status = FLEXY_STATUS_ENABLED;
 
     stepper->log_enabled = stepper->passthrough_saved_logging;
 
@@ -127,7 +130,7 @@ bool FlexyStepper_inPassthrough(FlexyStepper* stepper)
 
 void FlexyStepper_streamSetpoint(FlexyStepper* stepper, float position, float rate)
 {
-    if (!stepper->passthrough)
+    if (!stepper->passthrough || stepper->status == FLEXY_STATUS_FAULT)
         return;
 
     const float scale = fabsf(stepper->conversion);
@@ -208,5 +211,5 @@ void FlexyStepper_streamSetpoint(FlexyStepper* stepper, float position, float ra
     FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, 0.5f * v_ramp * v_ramp);
 
     stepper->targetPosition_InSteps = target;
-    stepper->is_moving = true;
+    stepper->status = FLEXY_STATUS_MOVING;
 }

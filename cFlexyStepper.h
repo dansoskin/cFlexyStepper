@@ -35,8 +35,31 @@ typedef enum FlexyStepper_move_status
 	FLEXY_MOVE_ALREADY_THERE,	/* distance is under one step, nothing to do */
 	FLEXY_MOVE_BAD_ARG,			/* distance/time not finite, or time <= 0 */
 	FLEXY_MOVE_BAD_SETUP,		/* conversion, accel or decel not positive */
-	FLEXY_MOVE_TOO_FAST			/* time is shorter than the ramps can achieve */
+	FLEXY_MOVE_TOO_FAST,		/* time is shorter than the ramps can achieve */
+	FLEXY_MOVE_FAULTED			/* axis is latched in fault, command refused */
 } FlexyStepper_move_status;
+
+/* Axis state. FAULT latches when the fault pin stays active for the debounce
+ * window and only leaves through a successful FlexyStepper_clearFault() pulse;
+ * every motion command is refused while it holds. */
+typedef enum FlexyStepper_status
+{
+	FLEXY_STATUS_IDLE = 0,		/* driver disabled, no motion */
+	FLEXY_STATUS_ENABLED,		/* enabled / holding torque, no motion */
+	FLEXY_STATUS_MOVING,		/* profile in progress */
+	FLEXY_STATUS_FAULT			/* fault latched, motion commands rejected */
+} FlexyStepper_status;
+
+/* The fault pin must read active this long, continuously, before FAULT latches,
+ * so a single glitch on the alarm wire does not estop the axis. */
+#ifndef FLEXY_FAULT_DEBOUNCE_US
+	#define FLEXY_FAULT_DEBOUNCE_US		2000
+#endif
+
+/* Width of the reset pulse FlexyStepper_clearFault() puts on the clear pin. */
+#ifndef FLEXY_FAULT_CLEAR_PULSE_US
+	#define FLEXY_FAULT_CLEAR_PULSE_US	10000
+#endif
 
 typedef enum cFlexyStepper_homing_sm_states
 {
@@ -53,6 +76,8 @@ typedef struct {
         uint8_t stepPin;
         uint8_t directionPin;
         uint8_t enablePin;
+        uint8_t faultPin;
+        uint8_t faultClearPin;
     #else
         // Pin configuration
         GPIO_TypeDef* stepPort;
@@ -61,6 +86,10 @@ typedef struct {
         uint16_t directionPin;
         GPIO_TypeDef* enablePort;
         uint16_t enablePin;
+        GPIO_TypeDef* faultPort;
+        uint16_t faultPin;
+        GPIO_TypeDef* faultClearPort;
+        uint16_t faultClearPin;
     #endif
 
     bool log_enabled;
@@ -93,9 +122,25 @@ typedef struct {
     float currentStepPeriod_InUS;
 
     bool inverse_enablePin;
-    bool is_moving;
+    FlexyStepper_status status;
     bool should_release;
     char motorName[20];
+
+    /* Fault handling. The *_connected flags exist because a port/pin pair of
+     * zero is indistinguishable from "never configured". */
+    bool fault_pin_connected;
+    bool inverse_faultPin;
+    bool fault_clear_pin_connected;
+    bool inverse_faultClearPin;
+    bool fault_clear_pulse_active;
+    uint32_t fault_clear_pulse_start_us;
+    /* Debounce: when the pin first read active, and whether it read active on
+     * the previous sample at all. */
+    bool fault_pin_was_active;
+    uint32_t fault_debounce_start_us;
+    /* Diagnostics, so an intermittent alarm is visible from the console. */
+    uint32_t fault_count;
+    uint32_t last_fault_us;
 
     float default_speed;
     float default_acceleration;
@@ -136,6 +181,7 @@ void FlexyStepper_logf(FlexyStepper* stepper, const char *format, ...);
 
 #ifdef MCU_ARDUINO
 	#define WRITE_PIN(port, pin, value) digitalWrite(pin, value)
+	#define READ_PIN(port, pin) digitalRead(pin)
     #define GET_MICROS micros()
     #define DELAY_MICROS(micros) delayMicroseconds(micros)
 #else
@@ -145,6 +191,7 @@ void FlexyStepper_logf(FlexyStepper* stepper, const char *format, ...);
     void FlexyStepper_attach_timer_for_micros(TIM_HandleTypeDef* htim);
 
 	#define WRITE_PIN(port, pin, value) HAL_GPIO_WritePin(port, pin, value)
+	#define READ_PIN(port, pin) HAL_GPIO_ReadPin(port, pin)
 	#define GET_MICROS HAL_GetMicros()
 	#define DELAY_MICROS(micros) HAL_DelayMicros(micros)
 #endif
@@ -165,13 +212,20 @@ void stop_cFlexyStepper_homing_sm(FlexyStepper* stepper);
 void FlexyStepper_enable_logging(FlexyStepper* stepper, bool enable);
 bool FlexyStepper_logging_enabled(FlexyStepper* stepper);
 
+/* Fault pins follow the enable pin's polarity convention: inverse = false means
+ * active high. The fault pin is the driver's alarm output; the clear pin is a
+ * dedicated reset output pulsed by FlexyStepper_clearFault(). */
 #ifdef MCU_ARDUINO
     void FlexyStepper_connectToPins(FlexyStepper* stepper, uint8_t stepPin, uint8_t directionPin);
     void FlexyStepper_connectEnablePin(FlexyStepper* stepper, uint8_t pin, bool inverse);
+    void FlexyStepper_connectFaultPin(FlexyStepper* stepper, uint8_t pin, bool inverse);
+    void FlexyStepper_connectFaultClearPin(FlexyStepper* stepper, uint8_t pin, bool inverse);
 #else
-    void FlexyStepper_connectToPins(FlexyStepper* stepper, GPIO_TypeDef* stepPort, uint16_t stepPin, 
+    void FlexyStepper_connectToPins(FlexyStepper* stepper, GPIO_TypeDef* stepPort, uint16_t stepPin,
                                 GPIO_TypeDef* directionPort, uint16_t directionPin);
     void FlexyStepper_connectEnablePin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse);
+    void FlexyStepper_connectFaultPin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse);
+    void FlexyStepper_connectFaultClearPin(FlexyStepper* stepper, GPIO_TypeDef* port, uint16_t pin, bool inverse);
 #endif
 
 
@@ -271,6 +325,27 @@ const char* FlexyStepper_move_status_str(FlexyStepper_move_status status);
 
 void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release);
 void FlexyStepper_loop(FlexyStepper* stepper);
+
+//----------------------------------------------------------------
+// Fault handling
+//
+// FlexyStepper_loop() samples the fault pin (once connected) and, after the
+// debounce window, estops the axis, releases the motor and latches
+// FLEXY_STATUS_FAULT. While latched, every motion command is refused.
+// FlexyStepper_clearFault() starts a reset pulse on the clear pin; the loop
+// drops the pin after FLEXY_FAULT_CLEAR_PULSE_US and, if the fault pin then
+// reads clean, releases the latch back to IDLE -- a driver still in alarm just
+// re-latches. Clearing a fault does NOT re-home: position is not to be trusted
+// after a driver alarm, and what to do about that is the application's call.
+//----------------------------------------------------------------
+
+FlexyStepper_status FlexyStepper_getStatus(FlexyStepper* stepper);
+bool FlexyStepper_isMoving(FlexyStepper* stepper);
+const char* FlexyStepper_status_str(FlexyStepper_status status);
+
+/* Non-blocking: returns immediately, the loop finishes the pulse. Ignored when
+ * no clear pin is connected or a pulse is already running. */
+void FlexyStepper_clearFault(FlexyStepper* stepper);
 
 //----------------------------------------------------------------
 // Passthrough streaming
