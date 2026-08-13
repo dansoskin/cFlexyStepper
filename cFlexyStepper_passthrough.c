@@ -109,7 +109,7 @@ void FlexyStepper_endPassthrough(FlexyStepper* stepper)
     /* Energised and holding -- unless a fault latched mid-stream, which must
      * survive leaving the mode. */
     if (stepper->status != FLEXY_STATUS_FAULT)
-        stepper->status = FLEXY_STATUS_ENABLED;
+        FlexyStepper_setStatus(stepper, FLEXY_STATUS_ENABLED);
 
     stepper->log_enabled = stepper->passthrough_saved_logging;
 
@@ -211,5 +211,5 @@ void FlexyStepper_streamSetpoint(FlexyStepper* stepper, float position, float ra
     FlexyStepper_setAccelerationInStepsPerSecondPerSecond(stepper, 0.5f * v_ramp * v_ramp);
 
     stepper->targetPosition_InSteps = target;
-    stepper->status = FLEXY_STATUS_MOVING;
+    FlexyStepper_setStatus(stepper, FLEXY_STATUS_MOVING);
 }

@@ -73,7 +73,11 @@ void FlexyStepper_Init(FlexyStepper* stepper, char* name) {
     stepper->currentStepPeriod_InUS = 0.0;
     stepper->nextStepPeriod_InUS = 0.0;
 
+    /* Assigned rather than set through FlexyStepper_setStatus(): the field is
+     * uninitialised here, so a change-guarded setter would be a coin toss, and
+     * an axis being constructed has nothing to announce. */
     stepper->status = FLEXY_STATUS_IDLE;
+    stepper->status_timer = GET_MICROS;
     stepper->should_release = false;
 
     stepper->fault_pin_connected = false;

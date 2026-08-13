@@ -123,6 +123,7 @@ typedef struct {
 
     bool inverse_enablePin;
     FlexyStepper_status status;
+    uint32_t status_timer;      /* GET_MICROS at the last status change */
     bool should_release;
     char motorName[20];
 
@@ -336,6 +337,12 @@ void FlexyStepper_loop(FlexyStepper* stepper);
 // driver alarm, and what to do about that is the application's call.
 //----------------------------------------------------------------
 
+/* The one place status changes. Announces the new state and stamps
+ * status_timer, so how long the axis has been in it is always available.
+ * Re-entering the state already held is a no-op: the timestamp has to mean
+ * "since the axis entered this state", and a streamed axis sets MOVING
+ * hundreds of times a second. */
+void FlexyStepper_setStatus(FlexyStepper* stepper, FlexyStepper_status status);
 FlexyStepper_status FlexyStepper_getStatus(FlexyStepper* stepper);
 bool FlexyStepper_isMoving(FlexyStepper* stepper);
 const char* FlexyStepper_status_str(FlexyStepper_status status);

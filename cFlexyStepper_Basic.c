@@ -138,7 +138,7 @@ void FlexyStepper_jog(FlexyStepper * stepper, float speed)
     // stepper->nextStepPeriod_InUS = 0.0;
     // stepper->directionOfMotion = 0;
 
-    stepper->status = FLEXY_STATUS_MOVING;
+    FlexyStepper_setStatus(stepper, FLEXY_STATUS_MOVING);
     stepper->should_release = 1;
     FlexyStepper_setSpeedInStepsPerSecond(stepper, fabsf(speed * stepper->conversion));
 
@@ -158,9 +158,12 @@ void FlexyStepper_setTargetPositionRelative(FlexyStepper* stepper, float distanc
         FlexyStepper_logf(stepper, "in fault, move refused\r\n");
         return;
     }
+    /* MOVING before en_motor: en_motor only tracks the IDLE<->ENABLED edge, so
+     * claiming the state first keeps a move from announcing "enabled" on its
+     * way to "moving". */
+    FlexyStepper_setStatus(stepper, FLEXY_STATUS_MOVING);
     FlexyStepper_en_motor(stepper, 1);
     FlexyStepper_setTargetPositionRelativeInSteps(stepper, (int32_t)round(distanceToMove * stepper->conversion));
-    stepper->status = FLEXY_STATUS_MOVING;
     stepper->should_release = should_release;
 }
 
@@ -171,9 +174,9 @@ void FlexyStepper_setTargetPosition(FlexyStepper* stepper, float absolutePositio
         FlexyStepper_logf(stepper, "in fault, move refused\r\n");
         return;
     }
+    FlexyStepper_setStatus(stepper, FLEXY_STATUS_MOVING);
     FlexyStepper_en_motor(stepper, 1);
     FlexyStepper_setTargetPositionInSteps(stepper, (int32_t)round(absolutePositionToMoveTo * stepper->conversion));
-    stepper->status = FLEXY_STATUS_MOVING;
     stepper->should_release = should_release;
 }
 
@@ -344,9 +347,9 @@ void FlexyStepper_en_motor(FlexyStepper* stepper, uint8_t state) {
      * MOVING, and only clearFault() may lift FAULT, so toggling enable must
      * disturb neither. */
     if (state && stepper->status == FLEXY_STATUS_IDLE)
-        stepper->status = FLEXY_STATUS_ENABLED;
+        FlexyStepper_setStatus(stepper, FLEXY_STATUS_ENABLED);
     else if (!state && stepper->status == FLEXY_STATUS_ENABLED)
-        stepper->status = FLEXY_STATUS_IDLE;
+        FlexyStepper_setStatus(stepper, FLEXY_STATUS_IDLE);
 }
 //-------------------------------------------------------------------------------
 void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release) {
@@ -369,6 +372,15 @@ void FlexyStepper_Estop(FlexyStepper* stepper, bool should_release) {
 
 //-------------------------------------------------------------------------------
 // Fault handling
+
+void FlexyStepper_setStatus(FlexyStepper* stepper, FlexyStepper_status status) {
+    if (stepper->status == status)
+        return;
+
+    stepper->status = status;
+    stepper->status_timer = GET_MICROS;
+    FlexyStepper_logf(stepper, "status: %s\r\n", FlexyStepper_status_str(status));
+}
 
 FlexyStepper_status FlexyStepper_getStatus(FlexyStepper* stepper) {
     return stepper->status;
@@ -412,10 +424,8 @@ void FlexyStepper_clearFault(FlexyStepper* stepper) {
     /* Drop the latch on faith: if the driver is still in alarm, the next loop
      * pass just latches FAULT again through the ordinary debounce. */
     stepper->fault_pin_was_active = false;
-    if (stepper->status == FLEXY_STATUS_FAULT) {
-        stepper->status = FLEXY_STATUS_IDLE;
-        FlexyStepper_logf(stepper, "fault cleared\r\n");
-    }
+    if (stepper->status == FLEXY_STATUS_FAULT)
+        FlexyStepper_setStatus(stepper, FLEXY_STATUS_IDLE);
 }
 
 static void FlexyStepper_serviceFault(FlexyStepper* stepper) {
@@ -441,13 +451,11 @@ static void FlexyStepper_serviceFault(FlexyStepper* stepper) {
 
     stepper->fault_count++;
     stepper->last_fault_us = GET_MICROS;
-    FlexyStepper_logf(stepper, "FAULT latched (count %lu)\r\n",
-                     (unsigned long)stepper->fault_count);
 
     /* FAULT before Estop: Estop() releases the motor and runs the loop once,
      * and neither the en_motor(0) inside it nor the recursive loop pass may
      * lift or miss the latch. */
-    stepper->status = FLEXY_STATUS_FAULT;
+    FlexyStepper_setStatus(stepper, FLEXY_STATUS_FAULT);
     FlexyStepper_Estop(stepper, true);
 }
 
@@ -464,17 +472,15 @@ void FlexyStepper_loop(FlexyStepper* stepper) {
         }
         else
         {
-            FlexyStepper_logf(stepper, "movement finished\r\n");
-
             if(stepper->should_release)
             {
-                stepper->status = FLEXY_STATUS_IDLE;
+                FlexyStepper_setStatus(stepper, FLEXY_STATUS_IDLE);
                 FlexyStepper_en_motor(stepper, 0);
                 stepper->should_release = false;
             }
             else
             {
-                stepper->status = FLEXY_STATUS_ENABLED;
+                FlexyStepper_setStatus(stepper, FLEXY_STATUS_ENABLED);
             }
         }
     }
