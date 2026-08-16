@@ -68,9 +68,6 @@ typedef enum cFlexyStepper_homing_sm_states
 	HOMING_ADJUST_POSITION, HOMING_DELAY3, HOMING_ERROR
 } cFlexyStepper_homing_sm_states;
 
-/* Everything the homing sequence owns, kept together so it is obvious at a
- * glance what belongs to homing and what belongs to the axis itself. Configured
- * through FlexyStepper_set_homing(); the state machine owns the rest. */
 typedef struct {
 	cFlexyStepper_homing_sm_states sm_state;
 	uint32_t sm_timer;			/* GET_MICROS at the last homing state change */
@@ -79,6 +76,7 @@ typedef struct {
 	float adjust_position;		/* offset travelled after the switch releases */
 	uint8_t* limit_switch_ptr;
 	float zero_pos;				/* position the axis is declared to be at when homed */
+	bool did_home;
 } FlexyStepper_homing;
 
 

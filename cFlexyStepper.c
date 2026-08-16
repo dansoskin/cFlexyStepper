@@ -93,6 +93,7 @@ void FlexyStepper_Init(FlexyStepper* stepper, char* name) {
     stepper->homing.direction = 0;
     stepper->homing.speed = 1.0;
     stepper->homing.sm_state = HOMING_IDLE;
+    stepper->homing.did_home = false;
 }
 
 

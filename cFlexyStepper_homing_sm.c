@@ -42,6 +42,7 @@ void FlexyStepper_set_homing(FlexyStepper* stepper,
 
 void start_cFlexyStepper_homing_sm(FlexyStepper* stepper)
 {
+	stepper->homing.did_home = false;
 	FlexyStepper_jog(stepper, stepper->homing.speed * stepper->homing.direction);
 	set_cFlexyStepper_homing_sm_state(stepper, HOMING_MOVE_TOWARDS_LIMIT);
 }
@@ -126,7 +127,10 @@ void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper)
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_IDLE);
 				FlexyStepper_setCurrentPosition(stepper, stepper->homing.zero_pos);
-			}	
+
+				stepper->homing.did_home = true;
+				FlexyStepper_logf(stepper, "homed at %.4f\r\n", stepper->homing.zero_pos);
+			}
 			break;
 
 		case HOMING_ERROR:
