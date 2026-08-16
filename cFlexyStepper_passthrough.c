@@ -69,10 +69,7 @@ void FlexyStepper_beginPassthrough(FlexyStepper* stepper)
     if (stepper->passthrough)
         return;
 
-    stepper->passthrough_saved_speed        = FlexyStepper_getTargetSpeed(stepper);
-    stepper->passthrough_saved_acceleration = FlexyStepper_getAcceleration(stepper);
-    stepper->passthrough_saved_deceleration = FlexyStepper_getDeceleration(stepper);
-    stepper->passthrough_saved_logging      = stepper->log_enabled;
+    stepper->passthrough_saved_logging = stepper->log_enabled;
 
     FlexyStepper_logf(stepper, "Passthrough on\r\n");
 
@@ -113,12 +110,10 @@ void FlexyStepper_endPassthrough(FlexyStepper* stepper)
 
     stepper->log_enabled = stepper->passthrough_saved_logging;
 
-    /* Acceleration before deceleration: setAcceleration resets the decel ramp
-     * to match itself, so the other order would silently discard the saved
-     * deceleration. */
-    FlexyStepper_setSpeed(stepper, stepper->passthrough_saved_speed);
-    FlexyStepper_setAcceleration(stepper, stepper->passthrough_saved_acceleration);
-    FlexyStepper_setDeceleration(stepper, stepper->passthrough_saved_deceleration);
+    /* The stream drove speed and both ramps far away from anything the axis
+     * would use on its own (see the derivation at the top of this file), so
+     * they have to be put back -- the axis defaults are that baseline. */
+    FlexyStepper_restoreDefaults(stepper);
 
     FlexyStepper_logf(stepper, "Passthrough off\r\n");
 }
@@ -160,12 +155,12 @@ void FlexyStepper_streamSetpoint(FlexyStepper* stepper, float position, float ra
 
     float v = feedforward + error / PASSTHROUGH_CATCHUP_SECONDS;
 
-    /* Capped at the speed this axis was configured with before the stream took
-     * over, so closing a large gap is a deliberate slew at a known rate rather
-     * than a lunge. Never below the feedforward though: during a fast sweep the
-     * feedforward legitimately exceeds the axis's ordinary working speed, and
-     * clamping to that would throttle the very motion being tracked. */
-    const float limit = fmaxf(feedforward, stepper->passthrough_saved_speed * scale);
+    /* Capped at this axis's default speed, so closing a large gap is a
+     * deliberate slew at a known rate rather than a lunge. Never below the
+     * feedforward though: during a fast sweep the feedforward legitimately
+     * exceeds the axis's ordinary working speed, and clamping to that would
+     * throttle the very motion being tracked. */
+    const float limit = fmaxf(feedforward, FlexyStepper_getDefaultSpeed(stepper) * scale);
     if (v > limit)
         v = limit;
 

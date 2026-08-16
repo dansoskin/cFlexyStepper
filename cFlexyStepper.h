@@ -79,9 +79,6 @@ typedef struct {
 	float adjust_position;		/* offset travelled after the switch releases */
 	uint8_t* limit_switch_ptr;
 	float zero_pos;				/* position the axis is declared to be at when homed */
-	/* The axis's working speed, captured when homing starts and put back once
-	 * the slow approach is done -- homing runs at its own speed. */
-	float saved_speed;
 } FlexyStepper_homing;
 
 
@@ -163,14 +160,11 @@ typedef struct {
 
     FlexyStepper_homing homing;
 
-    /* Passthrough streaming. The saved_* fields hold what the axis was
-     * configured with before the stream took over, so leaving the mode restores
-     * it exactly. */
+    /* Passthrough streaming. Speed and the ramps come back from the axis
+     * defaults on exit; only logging needs saving, since it is not part of
+     * them and may have been muted deliberately before the stream started. */
     bool  passthrough;
     bool  passthrough_saved_logging;
-    float passthrough_saved_speed;
-    float passthrough_saved_acceleration;
-    float passthrough_saved_deceleration;
 } FlexyStepper;
 
 // Logging sink: the application supplies a callback that transports a

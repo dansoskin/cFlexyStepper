@@ -42,7 +42,6 @@ void FlexyStepper_set_homing(FlexyStepper* stepper,
 
 void start_cFlexyStepper_homing_sm(FlexyStepper* stepper)
 {
-	stepper->homing.saved_speed = FlexyStepper_getTargetSpeed(stepper);	//store speed before homing
 	FlexyStepper_jog(stepper, stepper->homing.speed * stepper->homing.direction);
 	set_cFlexyStepper_homing_sm_state(stepper, HOMING_MOVE_TOWARDS_LIMIT);
 }
@@ -110,9 +109,8 @@ void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper)
 			if (GET_MICROS - stepper->homing.sm_timer >= HOMING_DELAY_US)
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_ADJUST_POSITION);
+				FlexyStepper_restoreDefaults(stepper);
 				FlexyStepper_setTargetPositionRelative(stepper, stepper->homing.adjust_position, false);
-				FlexyStepper_setSpeed(stepper, stepper->homing.saved_speed);
-
 			}
 			break;
 

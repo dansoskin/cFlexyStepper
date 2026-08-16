@@ -5,23 +5,25 @@ void FlexyStepper_decode_menu(char * buffer, size_t buffer_size)
 {
     snprintf(buffer, buffer_size,
         "Stepper commands:\n"
-        "E <0|1> - Enable/disable motor\n"
-        "P <position> - Set current position\n"
+        "E<0|1> - Enable/disable motor\n"
+        "P<position> - Set current position\n"
         "p - Get current position\n"
-        "V <speed> - Set speed\n"
+        "V<speed> - Set speed\n"
         "v - Get current velocity\n"
-        "A <acceleration> - Set acceleration\n"
+        "A<acceleration> - Set acceleration\n"
         "a - Get current acceleration\n"
-        "D <deceleration> - Set deceleration\n"
+        "D<deceleration> - Set deceleration\n"
         "d - Get current deceleration\n"
-        "J <speed> - Jog at speed\n"
-        "R <distance> - Move relative to current position\n"
-        "T <position> - Move to absolute position\n"
+        "J<speed> - Jog at speed\n"
+        "R<distance> - Move relative to current position\n"
+        "T<position> - Move to absolute position\n"
         "F - Restore default speed, acceleration, and deceleration\n"
         "k - Stop at target position\n"
         "K - Emergency stop and release motor\n"
         "s - Get status and fault count\n"
-        "C - Clear fault (pulse the clear pin)\n");
+        "C - Clear fault\n"
+        "H - Start homing state machine\n"
+    );
 }
 
 void FlexyStepper_decode(FlexyStepper * stpr, char cmd, char* arg)
