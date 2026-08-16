@@ -98,6 +98,10 @@ void FlexyStepper_decode(FlexyStepper * stpr, char cmd, char* arg)
             FlexyStepper_clearFault(stpr);
             break;
 
+        case 'H':
+            start_cFlexyStepper_homing_sm(stpr);
+            break;
+
 
         default:
             FlexyStepper_logf(stpr, "Unknown stepper command: %c\n", cmd);

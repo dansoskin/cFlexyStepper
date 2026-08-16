@@ -90,8 +90,9 @@ void FlexyStepper_Init(FlexyStepper* stepper, char* name) {
     strncpy(stepper->motorName, name, sizeof(stepper->motorName) - 1);
     stepper->motorName[sizeof(stepper->motorName) - 1] = '\0'; // Ensure null termination
 
-    stepper->homing_direction = 0;
-    stepper->homing_speed = 1.0;
+    stepper->homing.direction = 0;
+    stepper->homing.speed = 1.0;
+    stepper->homing.sm_state = HOMING_IDLE;
 }
 
 

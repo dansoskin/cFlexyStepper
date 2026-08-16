@@ -139,7 +139,7 @@ void FlexyStepper_jog(FlexyStepper * stepper, float speed)
     // stepper->directionOfMotion = 0;
 
     FlexyStepper_setStatus(stepper, FLEXY_STATUS_MOVING);
-    stepper->should_release = 1;
+    stepper->should_release = 0;
     FlexyStepper_setSpeedInStepsPerSecond(stepper, fabsf(speed * stepper->conversion));
 
 

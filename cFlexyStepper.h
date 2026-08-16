@@ -68,6 +68,22 @@ typedef enum cFlexyStepper_homing_sm_states
 	HOMING_ADJUST_POSITION, HOMING_DELAY3, HOMING_ERROR
 } cFlexyStepper_homing_sm_states;
 
+/* Everything the homing sequence owns, kept together so it is obvious at a
+ * glance what belongs to homing and what belongs to the axis itself. Configured
+ * through FlexyStepper_set_homing(); the state machine owns the rest. */
+typedef struct {
+	cFlexyStepper_homing_sm_states sm_state;
+	uint32_t sm_timer;			/* GET_MICROS at the last homing state change */
+	int direction;				/* 1 forward, -1 backward, 0 = homing not configured */
+	float speed;
+	float adjust_position;		/* offset travelled after the switch releases */
+	uint8_t* limit_switch_ptr;
+	float zero_pos;				/* position the axis is declared to be at when homed */
+	/* The axis's working speed, captured when homing starts and put back once
+	 * the slow approach is done -- homing runs at its own speed. */
+	float saved_speed;
+} FlexyStepper_homing;
+
 
 // FlexyStepper structure
 typedef struct {
@@ -145,14 +161,7 @@ typedef struct {
     float default_acceleration;
     float default_deceleration;
 
-    uint32_t homing_sm_timer;
-    cFlexyStepper_homing_sm_states homing_sm_state;
-    int homing_direction;
-    float homing_speed;
-    float homing_adjust_position;
-    uint8_t* homing_limit_switch_ptr;
-    float zero_pos;
-    float speed_after_homing;
+    FlexyStepper_homing homing;
 
     /* Passthrough streaming. The saved_* fields hold what the axis was
      * configured with before the stream took over, so leaving the mode restores

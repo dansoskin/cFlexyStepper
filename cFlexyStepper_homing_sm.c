@@ -13,14 +13,14 @@ const char *cFlexyStepper_homing_sm_states_strings[] =
 	
 void set_cFlexyStepper_homing_sm_state(FlexyStepper* stepper, cFlexyStepper_homing_sm_states st)
 {
-	stepper->homing_sm_state = st;
-	FlexyStepper_logf(stepper, "homing_sm_state: %s\r\n", cFlexyStepper_homing_sm_states_strings[stepper->homing_sm_state]);
-	stepper->homing_sm_timer = GET_MICROS;
+	stepper->homing.sm_state = st;
+	FlexyStepper_logf(stepper, "homing_sm_state: %s\r\n", cFlexyStepper_homing_sm_states_strings[stepper->homing.sm_state]);
+	stepper->homing.sm_timer = GET_MICROS;
 }
 
 cFlexyStepper_homing_sm_states get_cFlexyStepper_homing_sm_state(FlexyStepper* stepper)
 {
-	return stepper->homing_sm_state;
+	return stepper->homing.sm_state;
 }
 
 /*
@@ -33,17 +33,17 @@ void FlexyStepper_set_homing(FlexyStepper* stepper,
 							uint8_t* homing_limit_switch_ptr,
 							float new_zero_position)
 {
-	stepper->homing_direction = homing_direction;
-	stepper->homing_speed = homing_speed;
-	stepper->homing_adjust_position = homing_adjust_position;
-	stepper->homing_limit_switch_ptr = homing_limit_switch_ptr;
-	stepper->zero_pos = new_zero_position;
+	stepper->homing.direction = homing_direction;
+	stepper->homing.speed = homing_speed;
+	stepper->homing.adjust_position = homing_adjust_position;
+	stepper->homing.limit_switch_ptr = homing_limit_switch_ptr;
+	stepper->homing.zero_pos = new_zero_position;
 }
 
 void start_cFlexyStepper_homing_sm(FlexyStepper* stepper)
 {
-	stepper->speed_after_homing = FlexyStepper_getTargetSpeed(stepper);	//store speed before homing
-	FlexyStepper_jog(stepper, stepper->homing_speed * stepper->homing_direction);
+	stepper->homing.saved_speed = FlexyStepper_getTargetSpeed(stepper);	//store speed before homing
+	FlexyStepper_jog(stepper, stepper->homing.speed * stepper->homing.direction);
 	set_cFlexyStepper_homing_sm_state(stepper, HOMING_MOVE_TOWARDS_LIMIT);
 }
 
@@ -55,62 +55,64 @@ void stop_cFlexyStepper_homing_sm(FlexyStepper* stepper)
 
 void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper)
 {
-	if(stepper->homing_direction == 0)	//homing not set
+	if(stepper->homing.direction == 0)	//homing not set
 		return;
 
 	/* A fault estops the axis, so any move the sequence is waiting on will
 	 * never complete -- bail out instead of waiting forever. */
 	if (stepper->status == FLEXY_STATUS_FAULT &&
-		stepper->homing_sm_state != HOMING_IDLE &&
-		stepper->homing_sm_state != HOMING_ERROR)
+		stepper->homing.sm_state != HOMING_IDLE &&
+		stepper->homing.sm_state != HOMING_ERROR)
 	{
 		set_cFlexyStepper_homing_sm_state(stepper, HOMING_ERROR);
 	}
 
-	switch (stepper->homing_sm_state)
+	switch (stepper->homing.sm_state)
 	{
 		case HOMING_IDLE:
 			break;
 
 		case HOMING_MOVE_TOWARDS_LIMIT:
-			if (*(stepper->homing_limit_switch_ptr) == 1)
+			if (*(stepper->homing.limit_switch_ptr) == 1)
 			{
 				FlexyStepper_Estop(stepper, false);
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_DELAY1);
 			}
 
-			if (GET_MICROS - stepper->homing_sm_timer >= MOVING_TOWARDS_LIMIT_TIMEOUT_US)
+			if (GET_MICROS - stepper->homing.sm_timer >= MOVING_TOWARDS_LIMIT_TIMEOUT_US)
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_ERROR); 
 			}
 			break;
 
 		case HOMING_DELAY1:
-			if (GET_MICROS - stepper->homing_sm_timer >= HOMING_DELAY_US)
+			if (GET_MICROS - stepper->homing.sm_timer >= HOMING_DELAY_US)
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_MOVE_AWAY_FROM_LIMIT);
-				FlexyStepper_jog(stepper, (-1 * stepper->homing_direction) * 0.2 * stepper->homing_speed);
+				FlexyStepper_jog(stepper, (-1 * stepper->homing.direction) * 0.2 * stepper->homing.speed);
 			}
 			break;
 
 		case HOMING_MOVE_AWAY_FROM_LIMIT:
-			if (*(stepper->homing_limit_switch_ptr) == 0)
+			if (*(stepper->homing.limit_switch_ptr) == 0)
 			{
 				FlexyStepper_Estop(stepper, false);
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_DELAY2);
 			}
 
-			if(GET_MICROS - stepper->homing_sm_timer >= MOVING_AWAY_FROM_LIMIT_TIMEOUT_US)
+			if(GET_MICROS - stepper->homing.sm_timer >= MOVING_AWAY_FROM_LIMIT_TIMEOUT_US)
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_ERROR); 
 			}
 			break;
 
 		case HOMING_DELAY2:
-			if (GET_MICROS - stepper->homing_sm_timer >= HOMING_DELAY_US)
+			if (GET_MICROS - stepper->homing.sm_timer >= HOMING_DELAY_US)
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_ADJUST_POSITION);
-				FlexyStepper_setTargetPositionRelative(stepper, stepper->homing_adjust_position, true);
+				FlexyStepper_setTargetPositionRelative(stepper, stepper->homing.adjust_position, false);
+				FlexyStepper_setSpeed(stepper, stepper->homing.saved_speed);
+
 			}
 			break;
 
@@ -122,11 +124,10 @@ void cFlexyStepper_homing_sm_loop(FlexyStepper* stepper)
 			break;
 
 		case HOMING_DELAY3:
-			if (GET_MICROS - stepper->homing_sm_timer >= HOMING_DELAY_US)
+			if (GET_MICROS - stepper->homing.sm_timer >= HOMING_DELAY_US)
 			{
 				set_cFlexyStepper_homing_sm_state(stepper, HOMING_IDLE);
-				FlexyStepper_setCurrentPosition(stepper, stepper->zero_pos);
-				FlexyStepper_setSpeed(stepper, stepper->speed_after_homing);
+				FlexyStepper_setCurrentPosition(stepper, stepper->homing.zero_pos);
 			}	
 			break;
 
